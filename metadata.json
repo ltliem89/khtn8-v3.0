@@ -1,0 +1,6 @@
+{
+  "name": "Trợ Lý KHTN 8 - Tự Học Khoa Học Tự Nhiên Lớp 8",
+  "description": "Hệ thống tự học Khoa học Tự nhiên 8 chuẩn chương trình GDPT 2018 (Kết nối tri thức & Cánh Diều) với kiến thức cốt lõi, công thức, thí nghiệm ảo và trò chơi tương tác.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

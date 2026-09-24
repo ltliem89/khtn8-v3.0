@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+/* Accessibility Font Size Scaler */
+html {
+  font-size: 16px;
+  transition: font-size 0.15s ease-in-out;
+}
+
+html.font-size-md {
+  font-size: 16px;
+}
+
+html.font-size-lg {
+  font-size: 18px;
+}
+
+html.font-size-xl {
+  font-size: 20px;
+}
+
+/* Enhanced legibility for Vietnamese typography and KaTeX formulas */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* KaTeX formula rendering and responsive handling */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  padding: 0.35rem 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.katex-block-wrapper {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.katex {
+  text-rendering: optimizeLegibility;
+}
+
+/* A4 Print Engine Styles (17_DOCUMENT_EXPORT_RENDER_DEEP) */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 18mm 18mm 18mm 18mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+    line-height: 1.5 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide navigation, buttons, floating bars during printing */
+  header, nav, footer, .no-print, button:not(.print-allow), .print-hide {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .print-page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .katex-display {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin: 0.8em 0 !important;
+  }
+}
