@@ -30,6 +30,16 @@ import {
   Copy
 } from 'lucide-react';
 import { downloadFile, copyTextToClipboard, triggerPrintSafely } from '../utils/exportHelpers';
+import {
+  buildV5StandaloneHtml,
+  buildV5WordHtml,
+  buildV5PlainText,
+  buildV5PrintSheet,
+  buildQAReport,
+  buildLessonInventory,
+  formulaToPlain,
+  v5PrintCss
+} from '../utils/v5DocumentEngine';
 
 interface ExportConfig {
   includeSummary: boolean;
@@ -41,31 +51,11 @@ interface ExportConfig {
 }
 
 /**
- * Utility to convert basic LaTeX math expressions to legible text for Word/DOCX
+ * Utility to convert basic LaTeX math expressions to legible text for Word/DOCX.
+ * V5: uỷ thác cho v5DocumentEngine (chuẩn hoá dấu {,} thập phân -> "," các đơn vị m2/m3/oC...).
  */
 function latexToPlainText(latex: string): string {
-  if (!latex) return '';
-  let s = latex;
-  s = s.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1) / ($2)');
-  s = s.replace(/\\cdot/g, '·');
-  s = s.replace(/\\times/g, '×');
-  s = s.replace(/\\Delta/g, 'Δ');
-  s = s.replace(/\\rho/g, 'ρ');
-  s = s.replace(/\\approx/g, '≈');
-  s = s.replace(/\\le/g, '≤');
-  s = s.replace(/\\ge/g, '≥');
-  s = s.replace(/\\pm/g, '±');
-  s = s.replace(/\\degree/g, '°');
-  s = s.replace(/\\text\{([^}]+)\}/g, '$1');
-  s = s.replace(/\\mathrm\{([^}]+)\}/g, '$1');
-  s = s.replace(/\\mathbf\{([^}]+)\}/g, '$1');
-  s = s.replace(/\\%/g, '%');
-  s = s.replace(/\\;/g, ' ');
-  s = s.replace(/\\,/g, ' ');
-  s = s.replace(/\\/g, '');
-  s = s.replace(/_\{([^}]+)\}/g, '_$1');
-  s = s.replace(/\^\{([^}]+)\}/g, '^$1');
-  return s;
+  return formulaToPlain(latex);
 }
 
 /**
@@ -73,6 +63,10 @@ function latexToPlainText(latex: string): string {
  * and printed / saved as PDF via Ctrl+P with full A4 styling and zero iframe restrictions.
  */
 function generateStandaloneHtml(lessons: Lesson[], config: ExportConfig): string {
+  // V5: engine chuẩn hoá — MỤC LỤC + cấu trúc bài chuẩn + bảng đại lượng/đơn vị + công thức dạng toán học,
+  // không dùng separator gạch ngang. Template cũ phía dưới giữ làm tài liệu tham khảo (không còn chạy).
+  return buildV5StandaloneHtml(lessons, config);
+  /* eslint-disable no-unreachable */
   const lessonNamesSummary = lessons.map((l) => `Bài ${l.lessonNumber}: ${l.title}`).join(' · ');
 
   const lessonsContent = lessons
@@ -329,6 +323,9 @@ function generateStandaloneHtml(lessons: Lesson[], config: ExportConfig): string
  * Generates clean plain text / markdown for fast clipboard copying
  */
 function generatePlainText(lessons: Lesson[]): string {
+  // V5: plain text chuẩn hoá, bỏ separator gạch ngang thừa.
+  return buildV5PlainText(lessons);
+  /* eslint-disable no-unreachable */
   return lessons
     .map((l) => {
       const concepts = CONCEPTS.filter((c) => c.lessonId === l.id);
@@ -391,7 +388,7 @@ export const LyThuyetModule: React.FC = () => {
     context.lessonId || LESSONS[0].id
   ]);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
-  const [modalActiveTab, setModalActiveTab] = useState<'SELECT' | 'PREVIEW'>('SELECT');
+  const [modalActiveTab, setModalActiveTab] = useState<'SELECT' | 'PREVIEW' | 'QA'>('SELECT');
   const [copiedNotification, setCopiedNotification] = useState<boolean>(false);
 
   // Export configuration options
@@ -426,6 +423,14 @@ export const LyThuyetModule: React.FC = () => {
       (a, b) => a.lessonNumber - b.lessonNumber
     );
   }, [selectedLessonIds]);
+
+  // V5 QA report cho các bài đang chọn (quét text/công thức/đơn vị/cấu trúc/nguồn trước khi xuất)
+  const qaRows = useMemo(() => buildQAReport(selectedLessonsForExport), [selectedLessonsForExport]);
+  const qaInventory = useMemo(
+    () => buildLessonInventory(selectedLessonsForExport),
+    [selectedLessonsForExport]
+  );
+  const qaReadyCount = qaRows.filter((r) => r.status === 'READY').length;
 
   // Handle toggling a lesson selection
   const toggleLessonSelection = (id: string) => {
@@ -608,7 +613,18 @@ export const LyThuyetModule: React.FC = () => {
       .map((l) => `Bài ${l.lessonNumber}: ${l.title}`)
       .join('  ·  ');
 
-    const docContent = `
+    const docContent = (() => {
+      // V5: engine Word A4 — @page Section1 + header/footer Word + số trang, công thức plain_text, không separator gạch ngang.
+      return buildV5WordHtml(targets, {
+        includeSummary: exportConfig.includeSummary,
+        includeConcepts: exportConfig.includeConcepts,
+        includeFormulas: exportConfig.includeFormulas,
+        includeMisconceptions: exportConfig.includeMisconceptions,
+        includeRealWorld: exportConfig.includeRealWorld,
+        fontSize: exportConfig.fontSize
+      });
+      /* eslint-disable no-unreachable */
+      return `
       <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
       <head>
         <meta charset="utf-8">
@@ -652,6 +668,7 @@ export const LyThuyetModule: React.FC = () => {
       </body>
       </html>
     `;
+    })();
 
     const lessonNums = targets.map((l) => l.lessonNumber).join('_');
     const fileName =
@@ -1451,6 +1468,18 @@ export const LyThuyetModule: React.FC = () => {
                 <Eye className="w-3.5 h-3.5" />
                 <span>2. Xem Trước Tài Liệu Gộp ({selectedLessonsForExport.length} bài)</span>
               </button>
+              <button
+                type="button"
+                onClick={() => setModalActiveTab('QA')}
+                className={`py-3 px-3 border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  modalActiveTab === 'QA'
+                    ? 'border-teal-600 text-teal-800 font-bold'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <CheckSquare className="w-3.5 h-3.5" />
+                <span>3. Kiểm Tra Chất Lượng V5 ({selectedLessonsForExport.length} bài)</span>
+              </button>
             </div>
 
             {/* Modal Tab Content Area */}
@@ -1666,6 +1695,103 @@ export const LyThuyetModule: React.FC = () => {
                     </div>
                   </div>
                 </div>
+              ) : modalActiveTab === 'QA' ? (
+                /* V5 QA TAB */
+                <div className="space-y-4">
+                  <div className={`px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 border ${qaRows.length > 0 && qaReadyCount === qaRows.length ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-amber-50 text-amber-900 border-amber-200'}`}>
+                    <Check className="w-4 h-4 shrink-0" />
+                    <span>
+                      Kiểm tra chất lượng theo quy tắc V5 của <strong>{selectedLessonsForExport.length} bài</strong>:{' '}
+                      {qaRows.length === 0 ? (
+                        <span className="font-bold text-rose-600">Chưa chọn bài nào!</span>
+                      ) : qaReadyCount === qaRows.length ? (
+                        <span className="font-bold">Toàn bộ READY — sẵn sàng xuất bản.</span>
+                      ) : (
+                        <span className="font-bold">{qaReadyCount}/{qaRows.length} bài READY · {qaRows.length - qaReadyCount} bài cần rà soát (VERIFY).</span>
+                      )}
+                    </span>
+                  </div>
+
+                  {qaRows.length > 0 && (
+                    <>
+                      <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-xs">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-slate-100 text-left text-slate-700 uppercase tracking-wide text-2xs">
+                              <th className="px-3 py-2 font-bold">Bài học</th>
+                              <th className="px-3 py-2 font-bold text-center">Text</th>
+                              <th className="px-3 py-2 font-bold text-center">Công thức</th>
+                              <th className="px-3 py-2 font-bold text-center">Đơn vị</th>
+                              <th className="px-3 py-2 font-bold text-center">Cấu trúc</th>
+                              <th className="px-3 py-2 font-bold text-center">Trình bày</th>
+                              <th className="px-3 py-2 font-bold text-center">Nguồn</th>
+                              <th className="px-3 py-2 font-bold text-center">Trạng thái</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {qaRows.map((row) => (
+                              <tr key={row.lessonNumber} className="border-t border-slate-100 hover:bg-slate-50">
+                                <td className="px-3 py-2 font-semibold text-slate-900">
+                                  Bài {row.lessonNumber}: {row.lessonTitle}
+                                </td>
+                                {(['TEXT', 'FORMULA', 'UNIT', 'STRUCTURE', 'LAYOUT', 'SOURCE'] as const).map((col) => (
+                                  <td key={col} className="px-3 py-2 text-center">
+                                    <span
+                                      className={`inline-block px-2 py-0.5 rounded-full text-2xs font-bold ${
+                                        row.columns[col] === 'PASS'
+                                          ? 'bg-emerald-100 text-emerald-700'
+                                          : 'bg-amber-100 text-amber-800'
+                                      }`}
+                                    >
+                                      {row.columns[col] === 'PASS' ? 'PASS' : 'VERIFY'}
+                                    </span>
+                                  </td>
+                                ))}
+                                <td className="px-3 py-2 text-center">
+                                  <span
+                                    className={`inline-block px-2 py-0.5 rounded-full text-2xs font-bold ${
+                                      row.status === 'READY'
+                                        ? 'bg-emerald-600 text-white'
+                                        : 'bg-amber-500 text-white'
+                                    }`}
+                                  >
+                                    {row.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {qaRows.some((r) => r.issues.length > 0) && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-xs">
+                          <div className="font-bold uppercase tracking-wider text-amber-900 mb-1.5">
+                            Chi tiết vấn đề cần rà soát (trước khi xuất bản):
+                          </div>
+                          <ul className="space-y-1 text-amber-900">
+                            {qaRows
+                              .filter((r) => r.issues.length > 0)
+                              .map((r) =>
+                                r.issues.map((iss, idx) => (
+                                  <li key={`${r.lessonNumber}-${idx}`}>
+                                    <span className="font-bold">Bài {r.lessonNumber}:</span> {iss}
+                                  </li>
+                                ))
+                              )}
+                          </ul>
+                        </div>
+                      )}
+
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+                        <div className="font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                          Kiểm danh các bài học được gộp (Lesson Inventory — V5 §5):
+                        </div>
+                        <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-slate-600">{qaInventory}</pre>
+                      </div>
+                    </>
+                  )}
+                </div>
               ) : (
                 /* LIVE PREVIEW TAB */
                 <div className="space-y-4">
@@ -1812,6 +1938,17 @@ export const LyThuyetModule: React.FC = () => {
                   <Printer className="w-4 h-4 text-amber-200" />
                   <span>Xuất tổng hợp PDF ({selectedLessonsForExport.length} bài)</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleExportHtmlPrint(selectedLessonsForExport)}
+                  disabled={selectedLessonsForExport.length === 0}
+                  className="px-4 py-2 bg-white hover:bg-teal-50 text-teal-900 hover:text-teal-950 border border-teal-300 hover:border-teal-400 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                  title="Tải bản in A4 (.html) — mở trong trình duyệt rồi Ctrl+P để lưu PDF chuẩn A4 (công thức dạng toán học)"
+                >
+                  <FileText className="w-4 h-4 text-teal-600" />
+                  <span>Tải Bản In A4 (.html)</span>
+                </button>
               </div>
             </div>
           </div>
@@ -1823,108 +1960,9 @@ export const LyThuyetModule: React.FC = () => {
         const lessonsForPrint = printLessons.length > 0 ? printLessons : selectedLessonsForExport;
         return (
           <div id="printable-theory-area" className="hidden print:block font-serif text-slate-900 leading-relaxed">
-            <div className="text-center border-b-2 border-slate-800 pb-4 mb-6 space-y-1">
-              <div className="text-xs uppercase tracking-widest text-slate-600 font-sans font-semibold">
-                BỘ GIÁO DỤC VÀ ĐÀO TẠO · CHƯƠNG TRÌNH GDPT 2018
-              </div>
-              <h1 className="text-2xl font-bold uppercase text-slate-950 font-sans">
-                TÀI LIỆU LÝ THUYẾT CỐT LÕI KHOA HỌC TỰ NHIÊN 8
-              </h1>
-              <div className="text-xs text-slate-600 italic">
-                Bộ sách chuẩn hóa: Kết Nối Tri Thức & Cánh Diều · Ngày in: {new Date().toLocaleDateString('vi-VN')}
-                <br />
-                <strong>Danh sách bài học được gộp ({lessonsForPrint.length} bài):</strong>{' '}
-                {lessonsForPrint.map((l) => `Bài ${l.lessonNumber}: ${l.title}`).join(' · ')}
-              </div>
-            </div>
-
-            <div className="space-y-8">
-              {lessonsForPrint.map((lesson) => {
-            const concepts = CONCEPTS.filter((c) => c.lessonId === lesson.id);
-            const formulas = FORMULAS.filter((f) => f.lessonId === lesson.id);
-
-            return (
-              <div key={lesson.id} className="avoid-break space-y-4 border-b-2 border-slate-300 pb-8 mb-8 print-page-break">
-                <div>
-                  <div className="text-xs font-sans font-bold text-teal-800 uppercase">
-                    Bài {lesson.lessonNumber} · {lesson.domain === 'HOA_HOC' ? 'Hóa học' : lesson.domain === 'VAT_LI' ? 'Vật lí' : 'Sinh học'} · {lesson.chapterTitle}
-                  </div>
-                  <h2 className="text-lg font-bold text-slate-900 font-sans mt-0.5 uppercase">
-                    BÀI {lesson.lessonNumber}: {lesson.title}
-                  </h2>
-                </div>
-
-                {exportConfig.includeSummary && (
-                  <div className="space-y-1.5 text-xs">
-                    <div className="font-sans font-bold text-xs uppercase text-slate-800">
-                      1. Kiến thức cốt lõi (Em cần biết):
-                    </div>
-                    <ul className="list-disc pl-5 space-y-1">
-                      {lesson.summary.map((pt, pIdx) => (
-                        <li key={pIdx}>
-                          <MathView math={pt} />
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {exportConfig.includeConcepts && concepts.length > 0 && (
-                  <div className="space-y-2 text-xs">
-                    <div className="font-sans font-bold text-xs uppercase text-slate-800">
-                      2. Khái niệm then chốt & Bản chất khoa học:
-                    </div>
-                    {concepts.map((c) => (
-                      <div key={c.id} className="p-3 bg-slate-50 border border-slate-300 rounded space-y-1">
-                        <div className="font-sans font-bold text-slate-900">✦ {c.term}</div>
-                        <p className="italic text-slate-800">"{c.definition}"</p>
-                        {exportConfig.includeMisconceptions && c.commonMisconceptions.length > 0 && (
-                          <div className="text-2xs text-rose-800 pt-1 font-sans font-medium">
-                            ⚠️ Cần tránh nhầm lẫn: {c.commonMisconceptions.join(' ')}
-                          </div>
-                        )}
-                        {exportConfig.includeRealWorld && c.realWorldHook && (
-                          <div className="text-2xs text-amber-900 font-sans">
-                            🌍 Đời sống: {c.realWorldHook}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {exportConfig.includeFormulas && formulas.length > 0 && (
-                  <div className="space-y-2 text-xs">
-                    <div className="font-sans font-bold text-xs uppercase text-slate-800">
-                      3. Bảng công thức trọng tâm:
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {formulas.map((f) => (
-                        <div key={f.id} className="p-3 bg-slate-50 border border-slate-300 rounded text-center">
-                          <div className="font-sans font-bold text-xs text-slate-800">{f.name}</div>
-                          <div className="font-bold text-indigo-950 py-1 font-sans text-sm">
-                            <MathView math={f.formulaLatex} />
-                          </div>
-                          <div className="text-2xs text-slate-600 font-sans">{f.description}</div>
-                          {f.derivedForms && f.derivedForms.length > 0 && (
-                            <div className="text-2xs text-slate-500 font-sans pt-1">
-                              Biến đổi: {f.derivedForms.join(' | ')}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="text-center text-2xs text-slate-500 border-t border-slate-300 pt-3 mt-6 font-sans">
-          Trợ Lý Tự Học KHTN 8 — Tài liệu lưu hành nội bộ phục vụ học tập & giảng dạy.
-        </div>
-      </div>
+            <style dangerouslySetInnerHTML={{ __html: v5PrintCss() }} />
+            <div dangerouslySetInnerHTML={{ __html: buildV5PrintSheet(lessonsForPrint, exportConfig) }} />
+          </div>
     );
   })()}
     </div>
