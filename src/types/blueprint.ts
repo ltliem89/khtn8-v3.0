@@ -387,7 +387,12 @@ export type ToolItemType =
   | 'titration'
   | 'calculator'
   | 'notebook'
-  | 'pressure_gauge';
+  | 'pressure_gauge'
+  | 'graduated_cylinder'
+  | 'spring_scale'
+  | 'ammeter'
+  | 'voltmeter'
+  | 'joulemeter';
 
 export interface ToolItem {
   toolId: string;
@@ -560,6 +565,8 @@ export interface GameScene {
   tools: ToolItem[];
   npcs: NPCEntity[];
   currentQuestId: string;
+  themeKey?: string;    // Thể loại cảnh quan hiển thị: 'lab' | 'workshop' | 'underwater' | 'electric' | 'thermo'
+  lessonBadge?: string; // Nhãn ngắn để chọn màn, ví dụ 'B13 · Khối lượng riêng'
 }
 
 export interface GameStateV4 {

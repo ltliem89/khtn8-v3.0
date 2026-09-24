@@ -1,9 +1,70 @@
 @import "tailwindcss";
 
+/* ==== Compact Smart Learning World design tokens (1.KHTN8_SMART_LEARNING_INTERFACE_COMPACT) ==== */
+@theme {
+  --color-forest: #214f3d;
+  --color-forest2: #376d55;
+  --color-leaf: #719b73;
+  --color-sage: #dfeade;
+  --color-cream: #f5f0e2;
+  --color-paper: #fffdf8;
+  --color-ink: #24362e;
+  --color-muted: #718078;
+  --color-water: #4f8988;
+  --color-water2: #dcebea;
+  --color-earth: #a77a55;
+  --color-gold: #d4a84c;
+  --color-copper: #c9784c;
+  --color-clay: #a9574e;
+  --color-line: #d8dfd5;
+  --shadow-soft: 0 12px 34px rgba(35, 57, 47, 0.1);
+}
+
 /* Accessibility Font Size Scaler */
 html {
   font-size: 16px;
   transition: font-size 0.15s ease-in-out;
+}
+
+/* App-wide Compact Learning World backdrop (cream + soft radial glow) */
+body {
+  background:
+    radial-gradient(circle at 5% 0%, #e2eedf, transparent 27%),
+    radial-gradient(circle at 100% 10%, #dceceb, transparent 28%),
+    var(--color-cream);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* Reusable compact surfaces (mirror the compact interface card language) */
+.sw-card {
+  background: rgba(255, 253, 248, 0.95);
+  border: 1px solid var(--color-line);
+  border-radius: 18px;
+  box-shadow: 0 12px 34px rgba(35, 57, 47, 0.1);
+}
+.sw-card-flat {
+  background: rgba(255, 253, 248, 0.95);
+  border: 1px solid var(--color-line);
+  border-radius: 13px;
+}
+.sw-title {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--color-line);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-forest);
+}
+
+/* Hide scrollbars for horizontal nav/shelves */
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 html.font-size-md {

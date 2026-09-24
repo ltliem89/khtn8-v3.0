@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Tài liệu giảng dạy & bản HTML standalone — không đẩy lên git
+GIÁO ÁN NLS - KHTN 8 - VẬT LÍ/
+1.KHTN8_SMART_LEARNING_INTERFACE_COMPACT.html

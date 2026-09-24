@@ -841,7 +841,10 @@ export function evaluateActionConsequence(
         break;
       }
       updatedState.measured = true;
-      systemResponse = `Dùng thiết bị đo thành công! Thông số: Khối lượng = ${targetObject.state.massGas || 44}g; Thể tích = ${targetObject.state.volumeGas || 24.79}L.`;
+      const customText = targetObject.state.measureText;
+      systemResponse = customText
+        ? `Dùng thiết bị đo thành công! Thông số: ${customText}.`
+        : `Dùng thiết bị đo thành công! Thông số: Khối lượng = ${targetObject.state.massGas || 44}g; Thể tích = ${targetObject.state.volumeGas || 24.79}L.`;
       consequenceText = 'Dữ liệu đo đạc đã được ghi tự động vào Sổ Tay Hiện Trường.';
       evidence = createLearningEvidence(
         targetObject.knowledgeIds[0] || 'K_HOA_03',

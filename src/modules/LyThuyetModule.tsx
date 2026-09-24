@@ -1134,7 +1134,7 @@ export const LyThuyetModule: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handlePrintPdf([activeLesson])}
+                    onClick={() => handleDirectPrint([activeLesson])}
                     className="px-2.5 py-1 text-2xs font-semibold text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-md transition-colors flex items-center gap-1 cursor-pointer"
                     title="In riêng PDF A4 bài học này"
                   >

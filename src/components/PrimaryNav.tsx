@@ -54,7 +54,7 @@ export const PrimaryNav: React.FC = () => {
   const { currentTab, setTab } = useAppNavigation();
 
   return (
-    <nav className="bg-white border-b border-slate-200 overflow-x-auto no-scrollbar py-1">
+    <nav className="bg-paper border-b border-line overflow-x-auto no-scrollbar py-1">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-1 min-w-max">
           {NAV_ITEMS.map((item) => {
@@ -67,11 +67,11 @@ export const PrimaryNav: React.FC = () => {
                 onClick={() => setTab(item.tab)}
                 className={`flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg transition-all cursor-pointer select-none ${
                   isActive
-                    ? 'bg-slate-900 text-white font-semibold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    ? 'bg-forest text-white font-semibold shadow-xs'
+                    : 'text-muted hover:text-forest hover:bg-sage'
                 }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-teal-300' : 'text-slate-500'}`} />
+                <Icon className={`w-4 h-4 ${isActive ? 'text-gold' : 'text-leaf'}`} />
                 <span>{item.label}</span>
               </button>
             );

@@ -7,6 +7,10 @@ import {
   GameInventoryItem,
   NotebookEntry
 } from '../types/blueprint';
+import {
+  VAT_PHYSICS_SCENES,
+  VAT_PHYSICS_QUESTS
+} from './gameV4PhysicsData';
 
 /**
  * MASTER GAME SPEC v4.0 - GAMEPLAY-FIRST ENGINE DATA PACK
@@ -560,13 +564,15 @@ export const QUEST_PHYSICS_V4: GameQuestV4 = {
   ]
 };
 
-// All available scenes in v4
+// All available scenes in v4 (Hóa Học + Vật lí theo từng bài B13-B29)
 export const ALL_V4_SCENES: Record<string, GameScene> = {
   SC_HOA_01: SCENE_CHEMISTRY_LAB,
-  SC_VAT_01: SCENE_PHYSICS_SUBMARINE
+  SC_VAT_01: SCENE_PHYSICS_SUBMARINE,
+  ...VAT_PHYSICS_SCENES
 };
 
 export const ALL_V4_QUESTS: Record<string, GameQuestV4> = {
   QUEST_V4_01: QUEST_CHEMISTRY_V4,
-  QUEST_V4_PHYSICS: QUEST_PHYSICS_V4
+  QUEST_V4_PHYSICS: QUEST_PHYSICS_V4,
+  ...VAT_PHYSICS_QUESTS
 };

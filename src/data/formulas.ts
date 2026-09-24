@@ -312,6 +312,33 @@ export const FORMULAS: Formula[] = [
     }
   },
   {
+    id: 'F_LY_MOMENT_LUC',
+    name: 'Moment lực (tác dụng làm quay)',
+    formulaLatex: 'M = F \\cdot d',
+    description: 'Đại lượng đặc trưng cho khả năng làm vật quay: bằng tích độ lớn lực F với cánh tay đòn d (khoảng cách từ trục quay đến giá của lực).',
+    domain: 'VAT_LI',
+    lessonId: 'L_LY_18',
+    curriculum: 'KNTT',
+    sourceId: 'SRC_KNTT_SGK',
+    variables: [
+      { symbol: 'M', name: 'Moment lực', unit: 'N.m' },
+      { symbol: 'F', name: 'Độ lớn lực tác dụng (vuông góc với cánh tay đòn)', unit: 'N' },
+      { symbol: 'd', name: 'Cánh tay đòn (khoảng cách từ trục quay đến giá của lực)', unit: 'm' }
+    ],
+    conditions: ['d phải đổi ra mét (m)', 'Lực càng xa trục quay thì moment càng lớn, vật quay càng dễ'],
+    derivedForms: ['F = \\frac{M}{d}', 'd = \\frac{M}{F}'],
+    calculatorConfig: {
+      inputs: [
+        { id: 'F', label: 'Lực tác dụng (F)', unit: 'N', defaultValue: 50, min: 1 },
+        { id: 'd_cm', label: 'Cánh tay đòn (d)', unit: 'cm', defaultValue: 30, min: 1 }
+      ],
+      output: { label: 'Moment lực (M)', unit: 'N.m' },
+      calculate: (inputs) => {
+        return (inputs.F * inputs.d_cm) / 100;
+      }
+    }
+  },
+  {
     id: 'F_LY_NHIET_LUONG',
     name: 'Nhiệt lượng thu vào / toả ra',
     formulaLatex: 'Q = m \\cdot c \\cdot \\Delta t = m \\cdot c \\cdot (t_2 - t_1)',

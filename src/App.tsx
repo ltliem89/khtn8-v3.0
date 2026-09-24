@@ -41,7 +41,7 @@ const MainContent: React.FC = () => {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col text-slate-800 antialiased font-sans">
+    <div className="min-h-screen flex flex-col text-ink antialiased font-sans">
       {/* Top Header */}
       <Header />
 
@@ -74,10 +74,10 @@ const MainContent: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 mt-auto py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-xs text-slate-500 space-y-2">
+      <footer className="bg-paper border-t border-line mt-auto py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-xs text-muted space-y-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <span className="font-semibold text-slate-700">
+            <span className="font-semibold text-forest">
               Trợ Lý Tự Học Khoa Học Tự Nhiên 8 — Chương Trình GDPT 2018
             </span>
             <div className="flex items-center gap-4 text-2xs">
@@ -86,7 +86,7 @@ const MainContent: React.FC = () => {
               <span>SGK Cánh Diều</span>
             </div>
           </div>
-          <p className="text-2xs text-slate-400">
+          <p className="text-2xs text-muted/70">
             Dữ liệu khoa học được kiểm chứng nghiêm ngặt theo chuẩn Bộ Giáo Dục và Đào Tạo Việt Nam.
           </p>
         </div>
