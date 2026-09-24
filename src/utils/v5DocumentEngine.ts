@@ -132,7 +132,129 @@ export function formulaToPlain(latex: string): string {
   s = s.replace(/\^\{([^{}]*)\}/g, '^$1');
   s = s.replace(/_\{([^{}]*)\}/g, '_$1');
   s = s.replace(/\\/g, '');
+  // Chuyển ^ và _ thành chỉ số trên/dưới Unicode (m², 10⁵, t₂) — đẹp trong văn bản thuần
+  s = s.replace(/\^\{([^{}]*)\}/g, (m, g: string) => [...g].map((c) => SUPER_CHARS[c] ?? c).join(''));
+  s = s.replace(/_\{([^{}]*)\}/g, (m, g: string) => {
+    const r = [...g].map((c) => SUB_CHARS[c]);
+    return r.every(Boolean) ? r.join('') : '_' + g;
+  });
+  s = s.replace(/\^([0-9A-Za-z+\-=()])/g, (m, c) => SUPER_CHARS[c] || m);
+  s = s.replace(/_([0-9A-Za-z+\-=()])/g, (m, c) => SUB_CHARS[c] || m);
   return normalizeText(s);
+}
+
+/** Bảng Unicode chỉ số trên (mũ) cho văn bản thuần. */
+const SUPER_CHARS: Record<string, string> = {
+  '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+  '+': '⁺', '-': '⁻', '=': '⁼', '(': '⁽', ')': '⁾',
+  a: 'ᵃ', b: 'ᵇ', c: 'ᶜ', d: 'ᵈ', e: 'ᵉ', f: 'ᶠ', g: 'ᵍ', h: 'ʰ', i: 'ⁱ', j: 'ʲ', k: 'ᵏ', l: 'ˡ', m: 'ᵐ',
+  n: 'ⁿ', o: 'ᵒ', p: 'ᵖ', r: 'ʳ', s: 'ˢ', t: 'ᵗ', u: 'ᵘ', v: 'ᵛ', w: 'ʷ', x: 'ˣ', y: 'ʸ', z: 'ᶻ',
+  A: 'ᴬ', B: 'ᴮ', D: 'ᴰ', E: 'ᴱ', G: 'ᴳ', H: 'ᴴ', I: 'ᴵ', J: 'ᴶ', K: 'ᴷ', L: 'ᴸ', M: 'ᴹ', N: 'ᴺ', O: 'ᴼ',
+  P: 'ᴾ', R: 'ᴿ', T: 'ᵀ', U: 'ᵁ', W: 'ᵂ'
+};
+/** Bảng Unicode chỉ số dưới cho văn bản thuần. */
+const SUB_CHARS: Record<string, string> = {
+  '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉',
+  '+': '₊', '-': '₋', '=': '₌', '(': '₍', ')': '₎',
+  a: 'ₐ', e: 'ₑ', h: 'ₕ', i: 'ᵢ', j: 'ⱼ', k: 'ₖ', l: 'ₗ', m: 'ₘ', n: 'ₙ', o: 'ₒ', p: 'ₚ', r: 'ᵣ', s: 'ₛ', t: 'ₜ', u: 'ᵤ', v: 'ᵥ', x: 'ₓ'
+};
+
+/**
+ * LaTeX → HTML toán học cho Word (.doc): mũ/chỉ số bằng <sup>/<sub>,
+ * phân số \frac hiển thị đứng (tử trên mẫu dưới, kiểu toán học) — ngoại trừ đơn vị
+ * (N/m²) giữ nguyên dấu chia ngang. Không còn rò $, ^, _, dấu gạch chéo lệch.
+ */
+export function formulaToWordHtml(latex: string): string {
+  const frags: string[] = [];
+  const ph = (html: string): string => {
+    frags.push(html);
+    return '\uE000' + (frags.length - 1) + '\uE001';
+  };
+  const matched = (ss: string, i: number): number => {
+    let d = 0;
+    for (let j = i; j < ss.length; j++) {
+      if (ss[j] === '{') d++;
+      else if (ss[j] === '}') { d--; if (d === 0) return j; }
+    }
+    return -1;
+  };
+  const fracHtml = (num: string, den: string): string =>
+    `<table class="v5-frac" cellpadding="0" cellspacing="0"><tbody><tr><td class="v5-frac-num">${num}</td></tr><tr><td class="v5-frac-den">${den}</td></tr></tbody></table>`;
+
+  const conv = (t: string): string => {
+    if (!t) return '';
+    let s = String(t).replace(/\$/g, '');
+    // 1) phân số \frac{...}{...} (bằng cấp ngoặc đúng)
+    let out = '';
+    let i = 0;
+    while (i < s.length) {
+      if (s.startsWith('\\frac', i) || s.startsWith('\\dfrac', i)) {
+        let j = i + (s[i + 1] === 'd' ? 6 : 5);
+        while (j < s.length && /\s/.test(s[j])) j++;
+        if (s[j] === '{') {
+          const e1 = matched(s, j);
+          if (e1 !== -1) {
+            let k = e1 + 1;
+            while (k < s.length && /\s/.test(s[k])) k++;
+            if (s[k] === '{') {
+              const e2 = matched(s, k);
+              if (e2 !== -1) {
+                out += ph(fracHtml(conv(s.slice(j + 1, e1)), conv(s.slice(k + 1, e2))));
+                i = e2 + 1;
+                continue;
+              }
+            }
+          }
+        }
+        out += s.slice(i, j);
+        i = j;
+        continue;
+      }
+      out += s[i];
+      i++;
+    }
+    s = out;
+    // 2) văn bản đứng — lấy phần bên trong, không parse math
+    s = s.replace(/\\text\s*\{([^{}]*)\}/g, '$1');
+    s = s.replace(/\\mathrm\s*\{([^{}]*)\}/g, '$1');
+    s = s.replace(/\\mathbf\s*\{([^{}]*)\}/g, '$1');
+    s = s.replace(/\\underline\s*\{([^{}]*)\}/g, '$1');
+    // 3) mũ/chỉ số dạng {..}
+    s = s.replace(/\^\{([^{}]*)\}/g, (m, g: string) => ph(`<sup>${conv(g)}</sup>`));
+    s = s.replace(/_\{([^{}]*)\}/g, (m, g: string) => ph(`<sub>${conv(g)}</sub>`));
+    // 4) mũ/chỉ số 1 ký tự
+    s = s.replace(/\^([0-9A-Za-z])/g, (m, g) => ph(`<sup>${esc(g)}</sup>`));
+    s = s.replace(/_([0-9A-Za-z])/g, (m, g) => ph(`<sub>${esc(g)}</sub>`));
+    // 5) ký hiệu toán
+    s = s
+      .replace(/\\Delta/g, 'Δ')
+      .replace(/\\rho/g, 'ρ')
+      .replace(/\\mu/g, 'μ')
+      .replace(/\\pi/g, 'π')
+      .replace(/\\theta/g, 'θ')
+      .replace(/\\sigma/g, 'σ')
+      .replace(/\\Omega/g, 'Ω')
+      .replace(/\\omega/g, 'ω')
+      .replace(/\\cdot/g, '·')
+      .replace(/\\times/g, '×')
+      .replace(/\\approx|\\simeq/g, '≈')
+      .replace(/\\leq|\\le/g, '≤')
+      .replace(/\\geq|\\ge/g, '≥')
+      .replace(/\\pm/g, '±')
+      .replace(/\\iff/g, '⇔')
+      .replace(/\\degree/g, '°')
+      .replace(/\\percentage/g, '%')
+      .replace(/\\%/g, '%')
+      .replace(/\\sqrt\s*\{([^{}]*)\}/g, (m, g: string) => `√(${conv(g)})`);
+    // 6) khoảng cách & dấu thập phân
+    s = s.replace(/\\;/g, ' ').replace(/\\,/g, '').replace(/\\quad|\\qquad|\\ /g, ' ');
+    s = s.replace(/\{,\}/g, ',');
+    // 7) bỏ ngoặc nhọn LaTeX còn sót và dấu gạch chéo lệch
+    s = s.replace(/[{}]/g, '').replace(/\\/g, '');
+    // 8) escape text, sau đó khôi phục khối HTML của phân số/mũ
+    return esc(s).replace(/\uE000(\d+)\uE001/g, (m, d) => frags[Number(d)]);
+  };
+  return conv(latex);
 }
 
 /** KaTeX render with fail-safe fallback về plain text.
