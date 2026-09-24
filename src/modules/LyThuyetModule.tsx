@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppNavigation } from '../context/NavigationContext';
 import { useLearningState } from '../context/LearningStateContext';
 import { LESSONS } from '../data/curriculum';
@@ -740,6 +741,22 @@ export const LyThuyetModule: React.FC = () => {
   // Dedicated 'Xuất tổng hợp' handler - opens Export Center modal with options
   const handleExportTongHopPdf = (lessonsToExport: Lesson[]) => {
     handleOpenExportCenter(lessonsToExport);
+  };
+
+  // Modal footer 'Xuất tổng hợp PDF': đóng modal rồi mở lệnh in thật (Save as PDF A4)
+  const handleExportPdfFromModal = (lessonsToExport: Lesson[]) => {
+    const targets = lessonsToExport.length > 0 ? lessonsToExport : [activeLesson];
+    if (targets.length === 0) return;
+    setIsExportModalOpen(false);
+    setPrintLessons(targets);
+    setTimeout(() => {
+      const res = triggerPrintSafely();
+      if (!res.success || res.isIframe) {
+        showToast('💡 Nếu trình duyệt chặn in, hãy dùng "Tải Bản In A4 (.html)" rồi Ctrl+P!');
+      } else {
+        showToast('🖨️ Đã mở hộp thoại in — chọn "Lưu thành PDF" để tải PDF A4!');
+      }
+    }, 400);
   };
 
   // Copy quick summary to clipboard for a single lesson
@@ -1930,10 +1947,10 @@ export const LyThuyetModule: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={() => handleExportTongHopPdf(selectedLessonsForExport)}
+                  onClick={() => handleExportPdfFromModal(selectedLessonsForExport)}
                   disabled={selectedLessonsForExport.length === 0}
                   className="px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer shadow-xs disabled:opacity-50"
-                  title="Gộp nội dung các bài đã chọn vào một tài liệu PDF duy nhất"
+                  title="Đóng cửa sổ rồi mở lệnh in — chọn 'Lưu thành PDF' để tải PDF A4 chuẩn"
                 >
                   <Printer className="w-4 h-4 text-amber-200" />
                   <span>Xuất tổng hợp PDF ({selectedLessonsForExport.length} bài)</span>
@@ -1955,16 +1972,16 @@ export const LyThuyetModule: React.FC = () => {
         </div>
       )}
 
-      {/* ================= DEDICATED PRINT CONTAINER (HIDDEN ON SCREEN, SHOWN IN PRINT) ================= */}
-      {(() => {
-        const lessonsForPrint = printLessons.length > 0 ? printLessons : selectedLessonsForExport;
-        return (
-          <div id="printable-theory-area" className="hidden print:block font-serif text-slate-900 leading-relaxed">
+      {/* ================= DEDICATED PRINT CONTAINER (PORTAL → <body>, only when a print flow is active) ================= */}
+      {printLessons.length > 0 &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div id="printable-theory-area" className="font-serif text-slate-900 leading-relaxed">
             <style dangerouslySetInnerHTML={{ __html: v5PrintCss() }} />
-            <div dangerouslySetInnerHTML={{ __html: buildV5PrintSheet(lessonsForPrint, exportConfig) }} />
-          </div>
-    );
-  })()}
+            <div dangerouslySetInnerHTML={{ __html: buildV5PrintSheet(printLessons, exportConfig) }} />
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

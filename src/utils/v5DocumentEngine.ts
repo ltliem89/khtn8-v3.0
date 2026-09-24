@@ -426,93 +426,139 @@ export function buildV5PrintSheet(lessons: Lesson[], config: V5ExportConfig): st
   </div>`;
 }
 
-/** Word-compatible HTML (.doc): công thức ở dạng plain_text (V5 §12), header/footer Word, A4. */
+/** Word-compatible HTML (.doc): vỏ HTML theo chuẩn Word đã kiểm chứng (@page Section1 + div.Section1),
+ *  công thức ở dạng plain_text (V5 §12), không separator gạch ngang. */
 export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): string {
   const sorted = [...lessons].sort((a, b) => a.lessonNumber - b.lessonNumber);
-  const body = sorted
+
+  const unitTableFor = (l: Lesson): string => {
+    const unitRows = buildQuantityRows(l);
+    if (unitRows.length === 0) return '';
+    return `<table style="border-collapse:collapse;width:100%;page-break-inside:avoid;" cellspacing="0" cellpadding="4">
+      <tbody>
+        <tr style="background:#eef2f7;"><td style="border:1pt solid #94a3b8;"><b>Đại lượng</b></td><td style="border:1pt solid #94a3b8;"><b>Ký hiệu</b></td><td style="border:1pt solid #94a3b8;"><b>Đơn vị</b></td></tr>
+        ${unitRows
+          .map(
+            (r) =>
+              `<tr><td style="border:1pt solid #94a3b8;">${esc(r.name)}</td><td style="border:1pt solid #94a3b8;text-align:center;">${esc(r.symbol)}</td><td style="border:1pt solid #94a3b8;text-align:center;">${esc(r.unit)}</td></tr>`
+          )
+          .join('')}
+      </tbody>
+    </table>`;
+  };
+
+  const lessonBlocks = sorted
     .map((l) => {
-      const unitRows = buildQuantityRows(l);
-      const unitTable =
-        unitRows.length > 0
-          ? `<table style="border-collapse:collapse;width:100%;page-break-inside:avoid;" cellspacing="0" cellpadding="4">
-               <tbody>
-                 <tr style="background:#eef2f7;"><td style="border:1pt solid #94a3b8;"><b>Đại lượng</b></td><td style="border:1pt solid #94a3b8;"><b>Ký hiệu</b></td><td style="border:1pt solid #94a3b8;"><b>Đơn vị</b></td></tr>
-                 ${unitRows
-                   .map(
-                     (r) => `<tr><td style="border:1pt solid #94a3b8;">${esc(r.name)}</td><td style="border:1pt solid #94a3b8;text-align:center;">${esc(r.symbol)}</td><td style="border:1pt solid #94a3b8;text-align:center;">${esc(r.unit)}</td></tr>`
-                   )
-                   .join('')}
-               </tbody>
-             </table>`
-          : '';
-      const formulaBlocks = lessonFormulas(l.id)
+      const concepts = lessonConcepts(l.id);
+      const formulas = lessonFormulas(l.id);
+      const unitTable = unitTableFor(l);
+
+      const formulasCards = formulas
         .map((f) => {
           const fo = buildFormulaObject(f);
-          const vars =
+          const varsHtml =
             (f.variables || []).length > 0
-              ? `<div style="font-size:10pt;color:#374151;">Trong đó: ${(f.variables || [])
+              ? `<div style="font-size:9.5pt;color:#374151;margin-top:4pt;text-align:left;">Trong đó: ${(f.variables || [])
                   .map((v) => `${v.symbol}: ${esc(v.name)} (${esc(v.unit)})`)
                   .join('; ')}</div>`
               : '';
-          const der =
+          const derHtml =
             f.derivedForms && f.derivedForms.length > 0
-              ? `<div style="font-size:9.5pt;color:#475569;"><em>Biến đổi:</em> ${f.derivedForms.map((d) => esc(formulaToPlain(d))).join(' | ')}</div>`
+              ? `<div style="font-size:9.5pt;color:#4b5563;margin-top:4pt;text-align:left;"><em>Hệ quả biến đổi:</em> ${f.derivedForms
+                  .map((d) => esc(formulaToPlain(d)))
+                  .join('  |  ')}</div>`
               : '';
-          const cond =
+          const condHtml =
             f.conditions && f.conditions.length > 0
-              ? `<div style="font-size:9.5pt;color:#0f5c3c;"><em>Điều kiện:</em> ${f.conditions.map((c) => esc(formulaToPlain(c))).join(' · ')}</div>`
+              ? `<div style="font-size:9.5pt;color:#0f5c3c;margin-top:4pt;text-align:left;"><em>Điều kiện áp dụng:</em> ${f.conditions
+                  .map((c) => esc(formulaToPlain(c)))
+                  .join(' · ')}</div>`
               : '';
-          return `<div style="background:#f0f6ff;border:1pt solid #bcd2f0;padding:8pt 10pt;margin:6pt 0;page-break-inside:avoid;text-align:center;">
-            <div style="font-weight:bold;color:#1e3a8a;">${esc(f.name)}</div>
-            <div style="font-size:12.5pt;font-weight:bold;color:#1d4ed8;font-family:'Cambria Math','Times New Roman',serif;margin:4pt 0;">${esc(fo.plain_text)}</div>
-            ${vars}${der}${cond}
+          return `<div class="formula-card">
+            <div style="font-weight:bold;font-size:11pt;color:#1e3a8a;">${esc(f.name)}</div>
+            <div class="formula-math">${esc(fo.plain_text)}</div>
+            <div class="formula-desc">${esc(f.description)}</div>
+            ${varsHtml}${derHtml}${condHtml}
           </div>`;
         })
         .join('');
 
-      return `<div style="page-break-before:always;">
-        <div style="font-size:9pt;color:#0d9488;font-weight:bold;text-transform:uppercase;">${domainLabel(l.domain)} · ${esc(l.chapterTitle)} · Nguồn: ${l.curriculum}</div>
-        <h2 style="font-size:14pt;color:#047857;border-bottom:1.5pt solid #047857;padding-bottom:4pt;margin:2pt 0 6pt 0;">BÀI ${l.lessonNumber}: ${esc(l.title.toUpperCase())}</h2>
-        ${config.includeSummary ? `<h3 style="font-size:11pt;color:#0f172a;margin:8pt 0 4pt 0;">1. KIẾN THỨC TRỌNG TÂM</h3><ul>${l.summary.map((pt) => `<li>${esc(formulaToPlain(pt))}</li>`).join('')}</ul>` : ''}
-        ${config.includeFormulas && unitRows.length > 0 ? `<h3 style="font-size:11pt;color:#0f172a;margin:8pt 0 4pt 0;">2. ĐẠI LƯỢNG VÀ ĐƠN VỊ</h3>${unitTable}` : ''}
-        ${config.includeFormulas && lessonFormulas(l.id).length > 0 ? `<h3 style="font-size:11pt;color:#0f172a;margin:8pt 0 4pt 0;">3. CÔNG THỨC CẦN NHỚ</h3>${formulaBlocks}` : ''}
+      const misconceptItems = concepts.flatMap((c) =>
+        config.includeMisconceptions && c.commonMisconceptions.length > 0
+          ? c.commonMisconceptions.map((m) => ({ term: c.term, text: m }))
+          : []
+      );
+      const unitErrors = UNITS.filter((u) => u.domain === 'CHUNG' || u.domain === l.domain)
+        .map((u) => u.commonErrors)
+        .filter(Boolean);
+      const notesHtml =
+        misconceptItems.length > 0 || unitErrors.length > 0
+          ? `<h3 class="section-header">4. LƯU Ý</h3><ul>
+               ${misconceptItems.map((m) => `<li><b>⚠ ${esc(m.term)}:</b> ${esc(formulaToPlain(m.text))}</li>`).join('')}
+               ${unitErrors.map((e) => `<li><b>⚠ Đơn vị:</b> ${esc(formulaToPlain(e))}</li>`).join('')}
+             </ul>`
+          : '';
+
+      const realWorldHtml =
+        config.includeRealWorld && concepts.some((c) => c.realWorldHook)
+          ? `<h3 class="section-header">5. VẬN DỤNG THỰC TẾ</h3><ul>${concepts
+              .filter((c) => c.realWorldHook)
+              .map((c) => `<li>${esc(formulaToPlain(c.realWorldHook))}</li>`)
+              .join('')}</ul>`
+          : '';
+
+      return `<div class="lesson-block">
+        <div class="lesson-meta"><strong>Phân môn:</strong> ${domainLabel(l.domain)} | <strong>Chuyên đề:</strong> ${esc(l.chapterTitle)} | <strong>Nguồn:</strong> ${l.curriculum} (Bộ GD&ĐT - GDPT 2018)</div>
+        <h2 class="lesson-title">BÀI ${l.lessonNumber}: ${esc(l.title.toUpperCase())}</h2>
+        ${config.includeSummary ? `<h3 class="section-header">1. KIẾN THỨC TRỌNG TÂM</h3><ul>${l.summary.map((pt) => `<li>${esc(formulaToPlain(pt))}</li>`).join('')}</ul>` : ''}
+        ${config.includeFormulas && unitTable ? `<h3 class="section-header">2. ĐẠI LƯỢNG VÀ ĐƠN VỊ</h3>${unitTable}` : ''}
+        ${config.includeFormulas && formulas.length > 0 ? `<h3 class="section-header">3. CÔNG THỨC CẦN NHỚ</h3>${formulasCards}` : ''}
+        ${notesHtml}
+        ${realWorldHtml}
       </div>`;
     })
-    .join('');
+    .join('<div style="page-break-after: always; height: 16pt;"></div>');
+
+  const lessonNamesSummary = sorted
+    .map((l) => `Bài ${l.lessonNumber}: ${l.title}`)
+    .join('  ·  ');
 
   return `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
 <head>
 <meta charset="utf-8">
-<title>TƯ LIỆU LÝ THUYẾT KHTN 8 GỘP NHIỀU BÀI</title>
-<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->
+<title>TƯ LIỆU LÝ THUYẾT KHTN 8 GỘP NHIỀU BÀI HỌC</title>
 <style>
-  @page { size: 595.3pt 841.9pt; margin: 2.2cm 2cm 2cm 2cm; mso-header-margin: 1.2cm; mso-footer-margin: 1.2cm;
-    mso-header: url("v5header") h1; mso-footer: url("v5footer") f1; }
-  @page mso-header h1 { }
-  body { font-family: 'Times New Roman', serif; font-size: ${config.fontSize}; line-height: 1.5; color: #111827; }
-  h1.doc-title { font-size: 18pt; text-align:center; text-transform: uppercase; color:#0f172a; margin: 0 0 2pt 0; }
-  .doc-meta { font-size: 10pt; text-align:center; color:#475569; font-style: italic; margin-bottom: 14pt; }
-  .toc-box { background:#f1f5f9; border:1pt solid #cbd5e1; padding: 10pt 14pt; margin-bottom: 16pt; }
+  @page Section1 { size: 595.3pt 841.9pt; margin: 56.7pt 56.7pt 56.7pt 56.7pt; mso-header-margin: 36pt; mso-footer-margin: 36pt; }
+  div.Section1 { page: Section1; }
+  body { font-family: 'Times New Roman', serif; font-size: ${config.fontSize}; line-height: 1.55; color: #111827; }
+  h1.doc-title { font-size: 18pt; font-weight: bold; text-align: center; color: #0f172a; text-transform: uppercase; margin-bottom: 4pt; }
+  .doc-meta { font-size: 10pt; text-align: center; color: #475569; margin-bottom: 16pt; font-style: italic; }
+  .toc-box { background: #f1f5f9; border: 1pt solid #cbd5e1; padding: 10pt 14pt; margin-bottom: 20pt; }
+  .toc-title { font-weight: bold; font-size: 11pt; color: #0f172a; margin-bottom: 4pt; text-transform: uppercase; }
+  .lesson-block { margin-bottom: 18pt; }
+  h2.lesson-title { font-size: 13.5pt; font-weight: bold; color: #047857; border-bottom: 1.5pt solid #047857; padding-bottom: 4pt; margin-top: 14pt; margin-bottom: 6pt; }
+  .lesson-meta { font-size: 9pt; color: #64748b; margin-bottom: 8pt; }
+  h3.section-header { font-size: 11pt; font-weight: bold; color: #1e293b; margin-top: 10pt; margin-bottom: 4pt; }
   ul { margin: 4pt 0 8pt 18pt; padding: 0; }
   li { margin-bottom: 3pt; }
-  ul.v5-notes li { margin-bottom: 3pt; }
+  .formula-card { background: #eff6ff; border: 1pt solid #bfdbfe; padding: 7pt 10pt; margin-bottom: 7pt; text-align: center; page-break-inside: avoid; }
+  .formula-math { font-size: 12.5pt; font-weight: bold; color: #1e40af; margin: 3pt 0; font-family: 'Cambria Math', 'Times New Roman', serif; text-align: center; }
+  .formula-desc { font-size: 9pt; color: #374151; }
 </style>
 </head>
 <body>
-  <div style="mso-element:header;" id="v5header">
-    <p style="margin:0;font-size:8.5pt;color:#64748b;text-align:center;">KHTN 8 · TƯ LIỆU LÝ THUYẾT GỘP NHIỀU BÀI HỌC · GDPT 2018</p>
+  <div class="Section1">
+    <h1 class="doc-title">TƯ LIỆU LÝ THUYẾT — GỘP NHIỀU BÀI HỌC</h1>
+    <div class="doc-meta">
+      Bộ Giáo Dục và Đào Tạo · Chương Trình GDPT 2018 · ${sorted.length} bài (${sorted.map((l) => `Bài ${l.lessonNumber}`).join(', ')}) · Ngày xuất: ${new Date().toLocaleDateString('vi-VN')}
+    </div>
+    <div class="toc-box">
+      <div class="toc-title">DANH MỤC CÁC BÀI HỌC ĐƯỢC GỘP TRONG TÀI LIỆU (${sorted.length} bài)</div>
+      <div style="font-size: 9.5pt; color: #334155; line-height: 1.6;">${lessonNamesSummary}</div>
+    </div>
+    ${lessonBlocks}
+    <p style="text-align:center;font-size:9pt;color:#94a3b8;margin-top:18pt;font-style:italic;">Trợ Lý Tự Học KHTN 8 — Tài liệu lưu hành nội bộ phục vụ học tập & giảng dạy.</p>
   </div>
-  <div style="mso-element:footer;" id="v5footer">
-    <p style="margin:0;font-size:9pt;color:#475569;text-align:center;">Trang <!--[if supportFields]><span style="mso-element:field-begin;"></span>PAGE<span style="mso-element:field-separator;"></span><![endif]--><span style="mso-element:field-end;"></span></p>
-  </div>
-  <h1 class="doc-title">TƯ LIỆU LÝ THUYẾT — GỘP NHIỀU BÀI HỌC</h1>
-  <div class="doc-meta">Môn: KHTN 8 · ${sorted.length} bài (${sorted.map((l) => `Bài ${l.lessonNumber}`).join(', ')}) · Ngày xuất: ${new Date().toLocaleDateString('vi-VN')}</div>
-  <div class="toc-box">
-    <div style="font-weight:bold;font-size:11pt;text-transform:uppercase;color:#0f172a;margin-bottom:4pt;">MỤC LỤC</div>
-    ${sorted.map((l) => `<div style="font-size:10pt;color:#334155;">Bài ${l.lessonNumber} — ${esc(l.title)} (${domainLabel(l.domain)}, ${esc(l.chapterTitle)})</div>`).join('')}
-  </div>
-  ${body}
-  <p style="text-align:center;font-size:9pt;color:#94a3b8;margin-top:18pt;font-style:italic;">Trợ Lý Tự Học KHTN 8 — Tài liệu lưu hành nội bộ phục vụ học tập & giảng dạy.</p>
 </body>
 </html>`;
 }

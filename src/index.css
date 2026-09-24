@@ -101,7 +101,21 @@ body {
 }
 
 .katex {
-  text-rendering: optimizeLegibility;
+    text-rendering: optimizeLegibility;
+  }
+
+/* V5 Export sheet (portaled to <body>) — hidden on screen, the ONLY thing printed */
+#printable-theory-area {
+  display: none;
+}
+
+@media print {
+  body:has(#printable-theory-area) > *:not(#printable-theory-area) {
+    display: none !important;
+  }
+  body:has(#printable-theory-area) #printable-theory-area {
+    display: block !important;
+  }
 }
 
 /* A4 Print Engine Styles (17_DOCUMENT_EXPORT_RENDER_DEEP) */
