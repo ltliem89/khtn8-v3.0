@@ -57,6 +57,8 @@ export interface V5QARow {
 export function normalizeText(text: string): string {
   if (!text) return '';
   let s = text;
+  // Dấu $...$ phân đoạn math trong dữ liệu — bỏ hẳn dấu $ (TXT-002)
+  s = s.replace(/\$/g, '');
   // Hai-hoặc-nhiều khoảng trắng -> một khoảng trắng (TXT-001)
   s = s.replace(/[ \t]{2,}/g, ' ');
   // Khoảng trắng trước dấu câu (PUN-003)
@@ -90,8 +92,19 @@ function esc(s: string): string {
 export function formulaToPlain(latex: string): string {
   if (!latex) return '';
   let s = String(latex);
-  s = s.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '($1) / ($2)');
-  s = s.replace(/\\dfrac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '($1) / ($2)');
+  s = s.replace(/\$/g, '');
+  // \frac{a}{b} -> "a / b" nếu tử/mẫu là ký hiệu đơn giản; giữ ngoặc () khi là biểu thức phức tạp
+  const fracPiece = (x: string): string => {
+    const sim = x
+      .replace(/\\text\s*\{([^{}]*)\}/g, '$1')
+      .replace(/\\mathrm\s*\{([^{}]*)\}/g, '$1')
+      .replace(/\\mathbf\s*\{([^{}]*)\}/g, '$1')
+      .replace(/\\underline\s*\{([^{}]*)\}/g, '$1');
+    const simple = !/\s|[+\-*\\]/.test(sim) && !sim.includes('\\frac');
+    return simple ? sim : '(' + sim + ')';
+  };
+  s = s.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, (m, a, b) => `${fracPiece(a)} / ${fracPiece(b)}`);
+  s = s.replace(/\\dfrac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, (m, a, b) => `${fracPiece(a)} / ${fracPiece(b)}`);
   s = s.replace(/\\cdot/g, '·');
   s = s.replace(/\\times/g, '×');
   s = s.replace(/\\Delta/g, 'Δ');
@@ -122,18 +135,35 @@ export function formulaToPlain(latex: string): string {
   return normalizeText(s);
 }
 
-/** KaTeX render with fail-safe fallback về plain text. */
+/** KaTeX render with fail-safe fallback về plain text.
+ *  Dữ liệu viết math dạng $...$ lồng trong câu tiếng Việt — tách đoạn math/text để
+ *  không in rò dấu $ ra PDF/HTML. */
 export function renderLatexHtml(tex: string): string {
-  try {
-    return katex.renderToString(tex, {
-      throwOnError: false,
-      displayMode: true,
-      strict: 'ignore',
-      output: 'htmlAndMathml'
-    });
-  } catch {
-    return esc(formulaToPlain(tex));
+  const safeRender = (t: string, display: boolean): string => {
+    try {
+      return katex.renderToString(t, {
+        throwOnError: false,
+        displayMode: display,
+        strict: 'ignore',
+        output: 'htmlAndMathml'
+      });
+    } catch {
+      return esc(formulaToPlain(t));
+    }
+  };
+  if (!tex) return '';
+  if (tex.includes('$')) {
+    // Math inline đánh dấu $...$ lồng trong câu — render inline, text thường bọc ngoài
+    const parts = tex.split('$');
+    let out = '';
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      if (p === '') continue;
+      out += i % 2 === 1 ? safeRender(p, false) : esc(p);
+    }
+    return out;
   }
+  return safeRender(tex, true);
 }
 
 /** Build V5 formula object (§12.1). */
@@ -193,7 +223,7 @@ function quantityTableHtml(lesson: Lesson): string {
   if (rows.length === 0) return '';
   const body = rows
     .map(
-      (r) => `<tr><td>${esc(r.name)}</td><td style="text-align:center;white-space:nowrap;">${esc(r.symbol)}</td><td style="text-align:center;white-space:nowrap;">${esc(r.unit)}</td></tr>`
+      (r) => `<tr><td>${esc(r.name)}</td><td style="text-align:center;white-space:nowrap;">${esc(formulaToPlain(r.symbol))}</td><td style="text-align:center;white-space:nowrap;">${esc(r.unit)}</td></tr>`
     )
     .join('');
   return `<div class="v5-table-wrap avoid-break"><table class="v5-qty">
@@ -207,7 +237,7 @@ function formulaBlockHtml(f: Formula): string {
   const varsHtml =
     (f.variables || []).length > 0
       ? `<div class="v5-formula-vars">Trong đó:&nbsp; ${(f.variables || [])
-          .map((v) => `<span><i>${esc(v.symbol)}</i>: ${esc(v.name)} (${esc(v.unit)})</span>`)
+          .map((v) => `<span><i>${esc(formulaToPlain(v.symbol))}</i>: ${esc(v.name)} (${esc(v.unit)})</span>`)
           .join('; ')}</div>`
       : '';
   const derivedHtml =
@@ -440,7 +470,7 @@ export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): stri
         ${unitRows
           .map(
             (r) =>
-              `<tr><td style="border:1pt solid #94a3b8;">${esc(r.name)}</td><td style="border:1pt solid #94a3b8;text-align:center;">${esc(r.symbol)}</td><td style="border:1pt solid #94a3b8;text-align:center;">${esc(r.unit)}</td></tr>`
+              `<tr><td style="border:1pt solid #94a3b8;">${esc(r.name)}</td><td style="border:1pt solid #94a3b8;text-align:center;">${esc(formulaToPlain(r.symbol))}</td><td style="border:1pt solid #94a3b8;text-align:center;">${esc(r.unit)}</td></tr>`
           )
           .join('')}
       </tbody>
@@ -459,7 +489,7 @@ export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): stri
           const varsHtml =
             (f.variables || []).length > 0
               ? `<div style="font-size:9.5pt;color:#374151;margin-top:4pt;text-align:left;">Trong đó: ${(f.variables || [])
-                  .map((v) => `${v.symbol}: ${esc(v.name)} (${esc(v.unit)})`)
+                  .map((v) => `${esc(formulaToPlain(v.symbol))}: ${esc(v.name)} (${esc(v.unit)})`)
                   .join('; ')}</div>`
               : '';
           const derHtml =
@@ -580,7 +610,7 @@ export function buildV5PlainText(lessons: Lesson[]): string {
         ...(quantityRows.length > 0
           ? [
               '2. ĐẠI LƯỢNG VÀ ĐƠN VỊ:',
-              `  ${quantityRows.map((r) => `${r.name} (${r.symbol}) = ${r.unit}`).join('; ')}`,
+              `  ${quantityRows.map((r) => `${r.name} (${formulaToPlain(r.symbol)}) = ${r.unit}`).join('; ')}`,
               ''
             ]
           : []),
@@ -590,7 +620,7 @@ export function buildV5PlainText(lessons: Lesson[]): string {
               ...formulas.map(
                 (f) =>
                   `  • ${f.name}: ${formulaToPlain(f.formulaLatex)}\n    Trong đó: ${(f.variables || [])
-                    .map((v) => `${v.symbol} (${v.name}, đơn vị ${v.unit})`)
+                    .map((v) => `${formulaToPlain(v.symbol)} (${v.name}, đơn vị ${v.unit})`)
                     .join('; ')}` +
                   (f.derivedForms && f.derivedForms.length > 0
                     ? `\n    Biến đổi: ${f.derivedForms.map((d) => formulaToPlain(d)).join(' | ')}`
