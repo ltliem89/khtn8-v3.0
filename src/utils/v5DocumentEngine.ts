@@ -115,6 +115,7 @@ export function formulaToPlain(latex: string): string {
   s = s.replace(/\\le/g, '≤');
   s = s.replace(/\\ge/g, '≥');
   s = s.replace(/\\pm/g, '±');
+  s = s.replace(/\\iff/g, '⇔');
   s = s.replace(/\\degree/g, '°');
   s = s.replace(/\\text\s*\{([^{}]*)\}/g, '$1');
   s = s.replace(/\\mathrm\s*\{([^{}]*)\}/g, '$1');
@@ -124,6 +125,7 @@ export function formulaToPlain(latex: string): string {
   s = s.replace(/\\approx|\\simeq/g, '≈');
   s = s.replace(/\\times/g, '×');
   s = s.replace(/\\%/g, '%');
+  s = s.replace(/Δ\s+([A-Za-z])/g, 'Δ$1');
   s = s.replace(/\\;/g, ' ');
   s = s.replace(/\\,/g, '');
   s = s.replace(/\\quad|\\qquad|\\ /g, ' ');
@@ -138,8 +140,10 @@ export function formulaToPlain(latex: string): string {
     const r = [...g].map((c) => SUB_CHARS[c]);
     return r.every(Boolean) ? r.join('') : '_' + g;
   });
-  s = s.replace(/\^([0-9A-Za-z+\-=()])/g, (m, c) => SUPER_CHARS[c] || m);
-  s = s.replace(/_([0-9A-Za-z+\-=()])/g, (m, c) => SUB_CHARS[c] || m);
+  s = s.replace(/\^([0-9]+)/g, (m, g) => [...g].map((c) => SUPER_CHARS[c] ?? c).join(''));
+  s = s.replace(/_([0-9]+)/g, (m, g) => [...g].map((c) => SUB_CHARS[c] ?? c).join(''));
+  s = s.replace(/\^([A-Za-z])/g, (m, c) => SUPER_CHARS[c] || m);
+  s = s.replace(/_([A-Za-z])/g, (m, c) => SUB_CHARS[c] || m);
   return normalizeText(s);
 }
 
@@ -222,9 +226,11 @@ export function formulaToWordHtml(latex: string): string {
     // 3) mũ/chỉ số dạng {..}
     s = s.replace(/\^\{([^{}]*)\}/g, (m, g: string) => ph(`<sup>${conv(g)}</sup>`));
     s = s.replace(/_\{([^{}]*)\}/g, (m, g: string) => ph(`<sub>${conv(g)}</sub>`));
-    // 4) mũ/chỉ số 1 ký tự
-    s = s.replace(/\^([0-9A-Za-z])/g, (m, g) => ph(`<sup>${esc(g)}</sup>`));
-    s = s.replace(/_([0-9A-Za-z])/g, (m, g) => ph(`<sub>${esc(g)}</sub>`));
+    // 4) mũ/chỉ số 1 ký tự (số có thể nhiều chữ số: 10^23 -> 10²³)
+    s = s.replace(/\^([0-9]+)/g, (m, g) => ph(`<sup>${esc(g)}</sup>`));
+    s = s.replace(/_([0-9]+)/g, (m, g) => ph(`<sub>${esc(g)}</sub>`));
+    s = s.replace(/\^([A-Za-z]+)/g, (m, g) => ph(`<sup>${esc(g)}</sup>`));
+    s = s.replace(/_([A-Za-z]+)/g, (m, g) => ph(`<sub>${esc(g)}</sub>`));
     // 5) ký hiệu toán
     s = s
       .replace(/\\Delta/g, 'Δ')
@@ -244,7 +250,8 @@ export function formulaToWordHtml(latex: string): string {
       .replace(/\\iff/g, '⇔')
       .replace(/\\degree/g, '°')
       .replace(/\\percentage/g, '%')
-      .replace(/\\%/g, '%')
+.replace(/\\%/g, '%')
+      .replace(/Δ\s+([A-Za-z])/g, 'Δ$1')
       .replace(/\\sqrt\s*\{([^{}]*)\}/g, (m, g: string) => `√(${conv(g)})`);
     // 6) khoảng cách & dấu thập phân
     s = s.replace(/\\;/g, ' ').replace(/\\,/g, '').replace(/\\quad|\\qquad|\\ /g, ' ');
@@ -345,7 +352,7 @@ function quantityTableHtml(lesson: Lesson): string {
   if (rows.length === 0) return '';
   const body = rows
     .map(
-      (r) => `<tr><td>${esc(r.name)}</td><td style="text-align:center;white-space:nowrap;">${esc(formulaToPlain(r.symbol))}</td><td style="text-align:center;white-space:nowrap;">${esc(r.unit)}</td></tr>`
+      (r) => `<tr><td>${formulaToWordHtml(r.name)}</td><td style="text-align:center;white-space:nowrap;">${esc(formulaToPlain(r.symbol))}</td><td style="text-align:center;white-space:nowrap;">${esc(r.unit)}</td></tr>`
     )
     .join('');
   return `<div class="v5-table-wrap avoid-break"><table class="v5-qty">
@@ -359,7 +366,7 @@ function formulaBlockHtml(f: Formula): string {
   const varsHtml =
     (f.variables || []).length > 0
       ? `<div class="v5-formula-vars">Trong đó:&nbsp; ${(f.variables || [])
-          .map((v) => `<span><i>${esc(formulaToPlain(v.symbol))}</i>: ${esc(v.name)} (${esc(v.unit)})</span>`)
+          .map((v) => `<span><i>${formulaToWordHtml(v.symbol)}</i>: ${formulaToWordHtml(v.name)} (${esc(v.unit)})</span>`)
           .join('; ')}</div>`
       : '';
   const derivedHtml =
@@ -592,7 +599,7 @@ export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): stri
         ${unitRows
           .map(
             (r) =>
-              `<tr><td style="border:1pt solid #94a3b8;">${esc(r.name)}</td><td style="border:1pt solid #94a3b8;text-align:center;">${esc(formulaToPlain(r.symbol))}</td><td style="border:1pt solid #94a3b8;text-align:center;">${esc(r.unit)}</td></tr>`
+              `<tr><td style="border:1pt solid #94a3b8;">${formulaToWordHtml(r.name)}</td><td style="border:1pt solid #94a3b8;text-align:center;">${formulaToWordHtml(r.symbol)}</td><td style="border:1pt solid #94a3b8;text-align:center;">${esc(r.unit)}</td></tr>`
           )
           .join('')}
       </tbody>
@@ -607,28 +614,27 @@ export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): stri
 
       const formulasCards = formulas
         .map((f) => {
-          const fo = buildFormulaObject(f);
           const varsHtml =
             (f.variables || []).length > 0
               ? `<div style="font-size:9.5pt;color:#374151;margin-top:4pt;text-align:left;">Trong đó: ${(f.variables || [])
-                  .map((v) => `${esc(formulaToPlain(v.symbol))}: ${esc(v.name)} (${esc(v.unit)})`)
+                  .map((v) => `${formulaToWordHtml(v.symbol)}: ${formulaToWordHtml(v.name)} (${esc(v.unit)})`)
                   .join('; ')}</div>`
               : '';
           const derHtml =
             f.derivedForms && f.derivedForms.length > 0
               ? `<div style="font-size:9.5pt;color:#4b5563;margin-top:4pt;text-align:left;"><em>Hệ quả biến đổi:</em> ${f.derivedForms
-                  .map((d) => esc(formulaToPlain(d)))
+                  .map((d) => formulaToWordHtml(d))
                   .join('  |  ')}</div>`
               : '';
           const condHtml =
             f.conditions && f.conditions.length > 0
               ? `<div style="font-size:9.5pt;color:#0f5c3c;margin-top:4pt;text-align:left;"><em>Điều kiện áp dụng:</em> ${f.conditions
-                  .map((c) => esc(formulaToPlain(c)))
+                  .map((c) => formulaToWordHtml(c))
                   .join(' · ')}</div>`
               : '';
           return `<div class="formula-card">
             <div style="font-weight:bold;font-size:11pt;color:#1e3a8a;">${esc(f.name)}</div>
-            <div class="formula-math">${esc(fo.plain_text)}</div>
+            <div class="formula-math">${formulaToWordHtml(f.formulaLatex)}</div>
             <div class="formula-desc">${esc(f.description)}</div>
             ${varsHtml}${derHtml}${condHtml}
           </div>`;
@@ -646,8 +652,8 @@ export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): stri
       const notesHtml =
         misconceptItems.length > 0 || unitErrors.length > 0
           ? `<h3 class="section-header">4. LƯU Ý</h3><ul>
-               ${misconceptItems.map((m) => `<li><b>⚠ ${esc(m.term)}:</b> ${esc(formulaToPlain(m.text))}</li>`).join('')}
-               ${unitErrors.map((e) => `<li><b>⚠ Đơn vị:</b> ${esc(formulaToPlain(e))}</li>`).join('')}
+               ${misconceptItems.map((m) => `<li><b>⚠ ${esc(m.term)}:</b> ${formulaToWordHtml(m.text)}</li>`).join('')}
+               ${unitErrors.map((e) => `<li><b>⚠ Đơn vị:</b> ${formulaToWordHtml(e)}</li>`).join('')}
              </ul>`
           : '';
 
@@ -655,14 +661,14 @@ export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): stri
         config.includeRealWorld && concepts.some((c) => c.realWorldHook)
           ? `<h3 class="section-header">5. VẬN DỤNG THỰC TẾ</h3><ul>${concepts
               .filter((c) => c.realWorldHook)
-              .map((c) => `<li>${esc(formulaToPlain(c.realWorldHook))}</li>`)
+              .map((c) => `<li>${formulaToWordHtml(c.realWorldHook)}</li>`)
               .join('')}</ul>`
           : '';
 
       return `<div class="lesson-block">
         <div class="lesson-meta"><strong>Phân môn:</strong> ${domainLabel(l.domain)} | <strong>Chuyên đề:</strong> ${esc(l.chapterTitle)} | <strong>Nguồn:</strong> ${l.curriculum} (Bộ GD&ĐT - GDPT 2018)</div>
         <h2 class="lesson-title">BÀI ${l.lessonNumber}: ${esc(l.title.toUpperCase())}</h2>
-        ${config.includeSummary ? `<h3 class="section-header">1. KIẾN THỨC TRỌNG TÂM</h3><ul>${l.summary.map((pt) => `<li>${esc(formulaToPlain(pt))}</li>`).join('')}</ul>` : ''}
+        ${config.includeSummary ? `<h3 class="section-header">1. KIẾN THỨC TRỌNG TÂM</h3><ul>${l.summary.map((pt) => `<li>${formulaToWordHtml(pt)}</li>`).join('')}</ul>` : ''}
         ${config.includeFormulas && unitTable ? `<h3 class="section-header">2. ĐẠI LƯỢNG VÀ ĐƠN VỊ</h3>${unitTable}` : ''}
         ${config.includeFormulas && formulas.length > 0 ? `<h3 class="section-header">3. CÔNG THỨC CẦN NHỚ</h3>${formulasCards}` : ''}
         ${notesHtml}
@@ -696,6 +702,9 @@ export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): stri
   .formula-card { background: #eff6ff; border: 1pt solid #bfdbfe; padding: 7pt 10pt; margin-bottom: 7pt; text-align: center; page-break-inside: avoid; }
   .formula-math { font-size: 12.5pt; font-weight: bold; color: #1e40af; margin: 3pt 0; font-family: 'Cambria Math', 'Times New Roman', serif; text-align: center; }
   .formula-desc { font-size: 9pt; color: #374151; }
+  .v5-frac { display: inline-table; vertical-align: middle; text-align: center; border-collapse: collapse; margin: 0 2px; }
+  .v5-frac td { padding: 0 3px; line-height: 1.15; }
+  .v5-frac-num { border-bottom: 1.5pt solid #111827; }
 </style>
 </head>
 <body>
