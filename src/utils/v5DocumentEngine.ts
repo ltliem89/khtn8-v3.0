@@ -264,6 +264,131 @@ export function formulaToWordHtml(latex: string): string {
   return conv(latex);
 }
 
+/* ============================================================
+ * Word OMML math — công thức gốc Word (khi có \frac).
+ * Word HTML import coi bảng <table> là khối (break giữa công thức,
+ * style không thừa kế). <m:oMath> + <m:f> render đúng phân số đứng,
+ * giữ nguyên dòng, đồng nhất font Math. Chỉ dùng cho path Word (.doc)
+ * khi latex có \frac; mọi nơi khác giữ nguyên formulaToWordHtml.
+ * ============================================================ */
+const OMML_SYM: Record<string, string> = {
+  '\\cdot': '·', '\\times': '×', '\\approx': '≈', '\\simeq': '≈',
+  '\\leq': '≤', '\\le': '≤', '\\geq': '≥', '\\ge': '≥', '\\pm': '±',
+  '\\iff': '⇔', '\\leftrightarrow': '↔', '\\rightarrow': '→',
+  '\\degree': '°', '\\%': '%', '\\Delta': 'Δ', '\\rho': 'ρ', '\\mu': 'μ',
+  '\\pi': 'π', '\\theta': 'θ', '\\sigma': 'σ', '\\Omega': 'Ω', '\\omega': 'ω'
+};
+
+function ommlRun(t: string): string {
+  return `<m:r><m:t xml:space="preserve">${t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</m:t></m:r>`;
+}
+
+function ommlMatchGroup(ss: string, i: number): number {
+  let d = 0;
+  for (let j = i; j < ss.length; j++) {
+    if (ss[j] === '{') d++;
+    else if (ss[j] === '}') { d--; if (d === 0) return j; }
+  }
+  return -1;
+}
+
+/** LaTeX → OMML (Office Math). frac → m:f; mũ/chỉ số → m:sSup/m:sSub/m:sSubSup. */
+export function formulaToWordOMML(latex: string): string {
+  let s = String(latex ?? '').replace(/\$/g, '').replace(/\{,\}/g, ',');
+
+  const parseExpr = (str: string): string => {
+    const out: string[] = [];
+    let curBase: string | null = null;
+    let curSub: string | null = null;
+    let curSup: string | null = null;
+    const flush = () => {
+      if (curBase === null) return;
+      let g = curBase;
+      if (curSub !== null && curSup !== null) {
+        g = `<m:sSubSup><m:e>${g}</m:e><m:sub>${curSub}</m:sub><m:sup>${curSup}</m:sup></m:sSubSup>`;
+      } else if (curSub !== null) {
+        g = `<m:sSub><m:e>${g}</m:e><m:sub>${curSub}</m:sub></m:sSub>`;
+      } else if (curSup !== null) {
+        g = `<m:sSup><m:e>${g}</m:e><m:sup>${curSup}</m:sup></m:sSup>`;
+      }
+      out.push(g);
+      curBase = curSub = curSup = null;
+    };
+
+    let i = 0;
+    while (i < str.length) {
+      const c = str[i];
+      if (c === ' ' || c === '\t') { flush(); out.push(ommlRun(' ')); i++; continue; }
+      if (c === '{') {
+        const e = ommlMatchGroup(str, i);
+        if (e !== -1) { flush(); curBase = parseExpr(str.slice(i + 1, e)); i = e + 1; continue; }
+        i++; continue;
+      }
+      if (c === '}' || c === ';' || c === ':' || c === ',') { flush(); out.push(ommlRun(c)); i++; continue; }
+      if (c === '_') {
+        // arg: {..} hoặc 1 token
+        let k = i + 1;
+        while (k < str.length && /\s/.test(str[k])) k++;
+        if (str[k] === '{') { const e = ommlMatchGroup(str, k); if (e !== -1) { curSub = parseExpr(str.slice(k + 1, e)); i = e + 1; continue; } }
+        curSub = parseExpr(str[k] ?? ''); i = k + 1; continue;
+      }
+      if (c === '^') {
+        let k = i + 1;
+        while (k < str.length && /\s/.test(str[k])) k++;
+        if (str[k] === '{') { const e = ommlMatchGroup(str, k); if (e !== -1) { curSup = parseExpr(str.slice(k + 1, e)); i = e + 1; continue; } }
+        curSup = parseExpr(str[k] ?? ''); i = k + 1; continue;
+      }
+      if (c === '\\') {
+        let j = i + 1;
+        while (j < str.length && /[A-Za-z]/.test(str[j])) j++;
+        const name = str.slice(i, j);
+        if (name === '\\frac' || name === '\\dfrac') {
+          let k = j;
+          while (k < str.length && /\s/.test(str[k])) k++;
+          if (str[k] === '{' && ommlMatchGroup(str, k) !== -1) {
+            const e1 = ommlMatchGroup(str, k);
+            let m2 = e1 + 1;
+            while (m2 < str.length && /\s/.test(str[m2])) m2++;
+            if (str[m2] === '{' && ommlMatchGroup(str, m2) !== -1) {
+              const e2 = ommlMatchGroup(str, m2);
+              flush();
+              curBase = `<m:f><m:num>${parseExpr(str.slice(k + 1, e1))}</m:num><m:den>${parseExpr(str.slice(m2 + 1, e2))}</m:den></m:f>`;
+              i = e2 + 1;
+              continue;
+            }
+          }
+          i = j; continue;
+        }
+        if (name === '\\text' || name === '\\mathrm' || name === '\\mathbf') {
+          let k = j;
+          while (k < str.length && /\s/.test(str[k])) k++;
+          if (str[k] === '{') { const e = ommlMatchGroup(str, k); if (e !== -1) { flush(); curBase = ommlRun(str.slice(k + 1, e)); i = e + 1; continue; } }
+        }
+        if (name === '\\sqrt') {
+          let k = j;
+          while (k < str.length && /\s/.test(str[k])) k++;
+          if (str[k] === '{') { const e = ommlMatchGroup(str, k); if (e !== -1) { flush(); curBase = ommlRun('√') + parseExpr(str.slice(k + 1, e)); i = e + 1; continue; } }
+        }
+        if (OMML_SYM[name]) { flush(); curBase = ommlRun(OMML_SYM[name]); i = j; continue; }
+        // lệnh không rõ: bỏ dấu \, giữ phần text kế (thường là \text đã xử lý)
+        i = j; continue;
+      }
+      // chuỗi ký tự thường tới ký tự đặc biệt
+      let j = i;
+      while (j < str.length && !/[\\_{}^ \t]/.test(str[j])) j++;
+      const chunk = str.slice(i, j);
+      if (chunk.length > 0) { flush(); curBase = ommlRun(chunk); i = j; continue; }
+      i++;
+    }
+    flush();
+    return out.join('');
+  };
+
+  const body = parseExpr(s);
+  if (!body) return '';
+  return `<m:oMath>${body}</m:oMath>`;
+}
+
 /** KaTeX render cho một đoạn math THUẦN (formula latex / derived / condition).
  *  Luôn strip $ để katex không bao giờ nhận ký tự $ (chống lỗi parse màu đỏ). */
 export function renderLatexFormula(tex: string, display = false): string {
@@ -597,6 +722,10 @@ export function buildV5PrintSheet(lessons: Lesson[], config: V5ExportConfig): st
 export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): string {
   const sorted = [...lessons].sort((a, b) => a.lessonNumber - b.lessonNumber);
 
+  // Công thức có phân số → OMML (giữ nguyên dòng, style đồng nhất); không phân số → HTML sup/sub như cũ.
+  const wmath = (ltx: string): string =>
+    /\\frac|\\dfrac/.test(ltx || '') ? formulaToWordOMML(ltx) : formulaToWordHtml(ltx);
+
   const unitTableFor = (l: Lesson): string => {
     const unitRows = buildQuantityRows(l);
     if (unitRows.length === 0) return '';
@@ -606,7 +735,7 @@ export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): stri
         ${unitRows
           .map(
             (r) =>
-              `<tr><td style="border:1pt solid #94a3b8;">${formulaToWordHtml(r.name)}</td><td style="border:1pt solid #94a3b8;text-align:center;">${formulaToWordHtml(r.symbol)}</td><td style="border:1pt solid #94a3b8;text-align:center;">${esc(r.unit)}</td></tr>`
+              `<tr><td style="border:1pt solid #94a3b8;">${formulaToWordHtml(r.name)}</td><td style="border:1pt solid #94a3b8;text-align:center;">${wmath(r.symbol)}</td><td style="border:1pt solid #94a3b8;text-align:center;">${esc(r.unit)}</td></tr>`
           )
           .join('')}
       </tbody>
@@ -624,24 +753,24 @@ export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): stri
           const varsHtml =
             (f.variables || []).length > 0
               ? `<div style="font-size:9.5pt;color:#374151;margin-top:4pt;text-align:left;">Trong đó: ${(f.variables || [])
-                  .map((v) => `${formulaToWordHtml(v.symbol)}: ${formulaToWordHtml(v.name)} (${esc(v.unit)})`)
+                  .map((v) => `${wmath(v.symbol)}: ${wmath(v.name)} (${esc(v.unit)})`)
                   .join('; ')}</div>`
               : '';
           const derHtml =
             f.derivedForms && f.derivedForms.length > 0
               ? `<div style="font-size:9.5pt;color:#4b5563;margin-top:4pt;text-align:left;"><em>Hệ quả biến đổi:</em> ${f.derivedForms
-                  .map((d) => formulaToWordHtml(d))
+                  .map((d) => wmath(d))
                   .join('  |  ')}</div>`
               : '';
           const condHtml =
             f.conditions && f.conditions.length > 0
               ? `<div style="font-size:9.5pt;color:#0f5c3c;margin-top:4pt;text-align:left;"><em>Điều kiện áp dụng:</em> ${f.conditions
-                  .map((c) => formulaToWordHtml(c))
+                  .map((c) => wmath(c))
                   .join(' · ')}</div>`
               : '';
           return `<div class="formula-card">
             <div style="font-weight:bold;font-size:11pt;color:#1e3a8a;">${esc(f.name)}</div>
-            <div class="formula-math">${formulaToWordHtml(f.formulaLatex)}</div>
+            <div class="formula-math">${wmath(f.formulaLatex)}</div>
             <div class="formula-desc">${esc(f.description)}</div>
             ${varsHtml}${derHtml}${condHtml}
           </div>`;
@@ -659,8 +788,8 @@ export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): stri
       const notesHtml =
         misconceptItems.length > 0 || unitErrors.length > 0
           ? `<h3 class="section-header">4. LƯU Ý</h3><ul>
-               ${misconceptItems.map((m) => `<li><b>⚠ ${esc(m.term)}:</b> ${formulaToWordHtml(m.text)}</li>`).join('')}
-               ${unitErrors.map((e) => `<li><b>⚠ Đơn vị:</b> ${formulaToWordHtml(e)}</li>`).join('')}
+               ${misconceptItems.map((m) => `<li><b>⚠ ${esc(m.term)}:</b> ${wmath(m.text)}</li>`).join('')}
+               ${unitErrors.map((e) => `<li><b>⚠ Đơn vị:</b> ${wmath(e)}</li>`).join('')}
              </ul>`
           : '';
 
@@ -668,14 +797,14 @@ export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): stri
         config.includeRealWorld && concepts.some((c) => c.realWorldHook)
           ? `<h3 class="section-header">5. VẬN DỤNG THỰC TẾ</h3><ul>${concepts
               .filter((c) => c.realWorldHook)
-              .map((c) => `<li>${formulaToWordHtml(c.realWorldHook)}</li>`)
+              .map((c) => `<li>${wmath(c.realWorldHook)}</li>`)
               .join('')}</ul>`
           : '';
 
       return `<div class="lesson-block">
         <div class="lesson-meta"><strong>Phân môn:</strong> ${domainLabel(l.domain)} | <strong>Chuyên đề:</strong> ${esc(l.chapterTitle)} | <strong>Nguồn:</strong> ${l.curriculum} (Bộ GD&ĐT - GDPT 2018)</div>
         <h2 class="lesson-title">BÀI ${l.lessonNumber}: ${esc(l.title.toUpperCase())}</h2>
-        ${config.includeSummary ? `<h3 class="section-header">1. KIẾN THỨC TRỌNG TÂM</h3><ul>${l.summary.map((pt) => `<li>${formulaToWordHtml(pt)}</li>`).join('')}</ul>` : ''}
+        ${config.includeSummary ? `<h3 class="section-header">1. KIẾN THỨC TRỌNG TÂM</h3><ul>${l.summary.map((pt) => `<li>${wmath(pt)}</li>`).join('')}</ul>` : ''}
         ${config.includeFormulas && unitTable ? `<h3 class="section-header">2. ĐẠI LƯỢNG VÀ ĐƠN VỊ</h3>${unitTable}` : ''}
         ${config.includeFormulas && formulas.length > 0 ? `<h3 class="section-header">3. CÔNG THỨC CẦN NHỚ</h3>${formulasCards}` : ''}
         ${notesHtml}
@@ -688,7 +817,7 @@ export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): stri
     .map((l) => `Bài ${l.lessonNumber}: ${l.title}`)
     .join('  ·  ');
 
-  return `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+  return `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns:m='http://schemas.openxmlformats.org/officeDocument/2006/math' xmlns='http://www.w3.org/TR/REC-html40'>
 <head>
 <meta charset="utf-8">
 <title>TƯ LIỆU LÝ THUYẾT KHTN 8 GỘP NHIỀU BÀI HỌC</title>
