@@ -495,9 +495,12 @@ function quantityTableHtml(lesson: Lesson): string {
 function formulaBlockHtml(f: Formula): string {
   const varsHtml =
     (f.variables || []).length > 0
-      ? `<div class="v5-formula-vars">Trong đó:&nbsp; ${(f.variables || [])
-          .map((v) => `<span><i>${formulaToWordHtml(v.symbol)}</i>: ${formulaToWordHtml(v.name)} (${esc(v.unit)})</span>`)
-          .join('; ')}</div>`
+      ? `<div class="v5-formula-vars"><strong>Trong đó:</strong>&nbsp; ${(f.variables || [])
+          .map(
+            (v) =>
+              `<span class="v5-fvar"><span class="v5-fvar-sym">${formulaToWordHtml(v.symbol)}</span><span class="v5-fvar-label">${formulaToWordHtml(v.name)} (${esc(v.unit)})</span></span>`
+          )
+          .join('')}</div>`
       : '';
   const derivedHtml =
     f.derivedForms && f.derivedForms.length > 0
@@ -615,6 +618,9 @@ const V5_CLASS_CSS = `
   .v5-formula-latex { font-size: 13pt; color: #1d4ed8; margin: 5pt 0; page-break-inside: avoid; overflow-x: auto; }
   .v5-formula-desc { font-size: 9pt; color: #374151; font-style: italic; margin-top: 3pt; }
   .v5-formula-vars { font-size: 10pt; color: #374151; margin-top: 4pt; }
+  .v5-formula-vars .v5-fvar { display: inline-block; text-align: center; vertical-align: top; margin: 2pt 8pt 2pt 0; line-height: 1.25; }
+  .v5-formula-vars .v5-fvar-sym { font-weight: bold; }
+  .v5-formula-vars .v5-fvar-label { display: block; font-size: 8pt; color: #6b7280; font-weight: normal; }
   .v5-formula-derived { font-size: 9.5pt; color: #475569; margin-top: 3pt; }
   .v5-formula-cond { font-size: 9.5pt; color: #0f5c3c; margin-top: 3pt; }
   .v5-inline-math .katex-display { margin: 0.2em 0; }
@@ -753,9 +759,12 @@ export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): stri
         .map((f) => {
           const varsHtml =
             (f.variables || []).length > 0
-              ? `<div style="font-size:9.5pt;color:#374151;margin-top:4pt;text-align:left;">Trong đó: ${(f.variables || [])
-                  .map((v) => `${wmath(v.symbol)}: ${wmath(v.name)} (${esc(v.unit)})`)
-                  .join('; ')}</div>`
+              ? `<div style="font-size:9.5pt;color:#374151;margin-top:4pt;text-align:left;"><strong>Trong đó:</strong>&nbsp; ${(f.variables || [])
+                  .map(
+                    (v) =>
+                      `<span style="display:inline-block;text-align:center;vertical-align:top;margin-right:10pt;line-height:1.2;"><span style="font-weight:bold;">${wmath(v.symbol)}</span><br/><span style="font-size:8pt;color:#6b7280;">${wmath(v.name)} (${esc(v.unit)})</span></span>`
+                  )
+                  .join('')}</div>`
               : '';
           const derHtml =
             f.derivedForms && f.derivedForms.length > 0
