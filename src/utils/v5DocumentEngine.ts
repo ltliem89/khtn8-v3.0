@@ -264,35 +264,41 @@ export function formulaToWordHtml(latex: string): string {
   return conv(latex);
 }
 
-/** KaTeX render with fail-safe fallback về plain text.
- *  Dữ liệu viết math dạng $...$ lồng trong câu tiếng Việt — tách đoạn math/text để
- *  không in rò dấu $ ra PDF/HTML. */
+/** KaTeX render cho một đoạn math THUẦN (formula latex / derived / condition).
+ *  Luôn strip $ để katex không bao giờ nhận ký tự $ (chống lỗi parse màu đỏ). */
+export function renderLatexFormula(tex: string, display = false): string {
+  const t = String(tex ?? '').replace(/\$/g, '');
+  if (!t.trim()) return '';
+  try {
+    return katex.renderToString(t, {
+      throwOnError: false,
+      displayMode: display,
+      strict: 'ignore',
+      output: 'htmlAndMathml'
+    });
+  } catch {
+    return esc(formulaToPlain(t));
+  }
+}
+
+/** KaTeX render text MẪU VỚI inline $...$ (câu tiếng Việt trộn công thức).
+ *  Đoạn không có $…$ là văn bản THƯỜNG → escape (KHÔNG render toán toàn câu),
+ *  chỉ phần nằm trong $…$ được render KaTeX. Dữ liệu viết math dạng $...$ lồng trong
+ *  câu tiếng Việt — tách đoạn math/text để không in rò dấu $ ra PDF/HTML. */
 export function renderLatexHtml(tex: string): string {
-  const safeRender = (t: string, display: boolean): string => {
-    try {
-      return katex.renderToString(t, {
-        throwOnError: false,
-        displayMode: display,
-        strict: 'ignore',
-        output: 'htmlAndMathml'
-      });
-    } catch {
-      return esc(formulaToPlain(t));
-    }
-  };
   if (!tex) return '';
-  if (tex.includes('$')) {
-    // Math inline đánh dấu $...$ lồng trong câu — render inline, text thường bọc ngoài
-    const parts = tex.split('$');
+  const s = String(tex);
+  if (s.includes('$')) {
+    const parts = s.split('$');
     let out = '';
     for (let i = 0; i < parts.length; i++) {
       const p = parts[i];
       if (p === '') continue;
-      out += i % 2 === 1 ? safeRender(p, false) : esc(p);
+      out += i % 2 === 1 ? renderLatexFormula(p, false) : esc(formulaToPlain(p));
     }
     return out;
   }
-  return safeRender(tex, true);
+  return esc(formulaToPlain(s));
 }
 
 /** Build V5 formula object (§12.1). */
@@ -352,7 +358,7 @@ function quantityTableHtml(lesson: Lesson): string {
   if (rows.length === 0) return '';
   const body = rows
     .map(
-      (r) => `<tr><td>${formulaToWordHtml(r.name)}</td><td style="text-align:center;white-space:nowrap;">${esc(formulaToPlain(r.symbol))}</td><td style="text-align:center;white-space:nowrap;">${esc(r.unit)}</td></tr>`
+      (r) => `<tr><td>${formulaToWordHtml(r.name)}</td><td style="text-align:center;white-space:nowrap;">${renderLatexFormula(r.symbol)}</td><td style="text-align:center;white-space:nowrap;">${esc(r.unit)}</td></tr>`
     )
     .join('');
   return `<div class="v5-table-wrap avoid-break"><table class="v5-qty">
@@ -372,7 +378,7 @@ function formulaBlockHtml(f: Formula): string {
   const derivedHtml =
     f.derivedForms && f.derivedForms.length > 0
       ? `<div class="v5-formula-derived"><strong>Biến đổi:</strong> ${f.derivedForms
-          .map((d) => `<span class="v5-inline-math">${renderLatexHtml(d)}</span>`)
+          .map((d) => `<span class="v5-inline-math">${renderLatexFormula(d)}</span>`)
           .join('&nbsp;&nbsp;')}</div>`
       : '';
   const condHtml =
@@ -383,7 +389,7 @@ function formulaBlockHtml(f: Formula): string {
       : '';
   return `<div class="v5-formula avoid-break">
     <div class="v5-formula-name">${esc(f.name)}</div>
-    <div class="v5-formula-latex">${renderLatexHtml(f.formulaLatex)}</div>
+    <div class="v5-formula-latex">${renderLatexFormula(f.formulaLatex, true)}</div>
     ${varsHtml}
     ${derivedHtml}
     ${condHtml}
