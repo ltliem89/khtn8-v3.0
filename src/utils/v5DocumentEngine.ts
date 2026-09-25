@@ -368,7 +368,6 @@ function quantityTableHtml(lesson: Lesson): string {
 }
 
 function formulaBlockHtml(f: Formula): string {
-  const fo = buildFormulaObject(f);
   const varsHtml =
     (f.variables || []).length > 0
       ? `<div class="v5-formula-vars">Trong đó:&nbsp; ${(f.variables || [])
@@ -390,6 +389,7 @@ function formulaBlockHtml(f: Formula): string {
   return `<div class="v5-formula avoid-break">
     <div class="v5-formula-name">${esc(f.name)}</div>
     <div class="v5-formula-latex">${renderLatexFormula(f.formulaLatex, true)}</div>
+    ${f.description ? `<div class="v5-formula-desc">${renderLatexHtml(f.description)}</div>` : ''}
     ${varsHtml}
     ${derivedHtml}
     ${condHtml}
@@ -487,6 +487,7 @@ const V5_CLASS_CSS = `
   .v5-formula { background: #f0f6ff; border: 1pt solid #bcd2f0; border-radius: 6pt; padding: 9pt 12pt; margin: 6pt 0 10pt 0; page-break-inside: avoid; }
   .v5-formula-name { font-weight: bold; color: #1e3a8a; font-size: 11pt; page-break-after: avoid; }
   .v5-formula-latex { font-size: 13pt; color: #1d4ed8; margin: 5pt 0; page-break-inside: avoid; overflow-x: auto; }
+  .v5-formula-desc { font-size: 9pt; color: #374151; font-style: italic; margin-top: 3pt; }
   .v5-formula-vars { font-size: 10pt; color: #374151; margin-top: 4pt; }
   .v5-formula-derived { font-size: 9.5pt; color: #475569; margin-top: 3pt; }
   .v5-formula-cond { font-size: 9.5pt; color: #0f5c3c; margin-top: 3pt; }
@@ -756,7 +757,7 @@ export function buildV5PlainText(lessons: Lesson[]): string {
               '3. CÔNG THỨC CẦN NHỚ:',
               ...formulas.map(
                 (f) =>
-                  `  • ${f.name}: ${formulaToPlain(f.formulaLatex)}\n    Trong đó: ${(f.variables || [])
+                  `  • ${f.name}: ${formulaToPlain(f.formulaLatex)}\n    ${f.description}\n    Trong đó: ${(f.variables || [])
                     .map((v) => `${formulaToPlain(v.symbol)} (${v.name}, đơn vị ${v.unit})`)
                     .join('; ')}` +
                   (f.derivedForms && f.derivedForms.length > 0
