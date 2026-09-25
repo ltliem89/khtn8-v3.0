@@ -587,7 +587,8 @@ function lessonBlockHtml(lesson: Lesson, config: V5ExportConfig, withKatex = tru
  * ============================================================ */
 const V5_CLASS_CSS = `
   * { box-sizing: border-box; }
-  body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; line-height: 1.5; color: #111827; margin: 0; padding: 0; background: #fff; }
+  body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; line-height: 1.5; color: #111827; margin: 0; padding: 0; background: #fff; text-align: justify; }
+  .avoid-break { page-break-inside: avoid; break-inside: avoid; }
   .v5-sheet { max-width: 100%; }
   .v5-cover { text-align: center; padding-bottom: 12pt; margin-bottom: 14pt; border-bottom: 2pt solid #0f172a; }
   .v5-cover-sub { font-size: 9pt; text-transform: uppercase; letter-spacing: 1.5px; color: #475569; font-weight: bold; }
@@ -602,9 +603,9 @@ const V5_CLASS_CSS = `
   .v5-lesson-title { font-size: 14pt; font-weight: bold; color: #047857; border-bottom: 1.5pt solid #047857; padding-bottom: 4pt; margin: 4pt 0 6pt 0; page-break-after: avoid; }
   .v5-section-title { font-size: 11pt; font-weight: bold; color: #0f172a; margin: 10pt 0 4pt 0; page-break-after: avoid; }
   .v5-summary { margin: 4pt 0 8pt 0; padding-left: 18pt; }
-  .v5-summary li { margin-bottom: 3pt; }
+  .v5-summary li { margin-bottom: 3pt; page-break-inside: avoid; break-inside: avoid; }
   ul.v5-notes { margin: 4pt 0 8pt 0; padding-left: 18pt; }
-  ul.v5-notes li { margin-bottom: 3pt; }
+  ul.v5-notes li { margin-bottom: 3pt; page-break-inside: avoid; break-inside: avoid; }
   .v5-table-wrap { margin: 4pt 0 10pt 0; }
   table.v5-qty { border-collapse: collapse; width: 100%; page-break-inside: avoid; }
   table.v5-qty th, table.v5-qty td { border: 1pt solid #94a3b8; padding: 5pt 8pt; font-size: 10.5pt; }
@@ -824,17 +825,18 @@ export function buildV5WordHtml(lessons: Lesson[], config: V5ExportConfig): stri
 <style>
   @page Section1 { size: 595.3pt 841.9pt; margin: 56.7pt 56.7pt 56.7pt 56.7pt; mso-header-margin: 36pt; mso-footer-margin: 36pt; }
   div.Section1 { page: Section1; }
-  body { font-family: 'Times New Roman', serif; font-size: ${config.fontSize}; line-height: 1.55; color: #111827; }
+  body { font-family: 'Times New Roman', serif; font-size: ${config.fontSize}; line-height: 1.55; color: #111827; text-align: justify; }
   h1.doc-title { font-size: 18pt; font-weight: bold; text-align: center; color: #0f172a; text-transform: uppercase; margin-bottom: 4pt; }
   .doc-meta { font-size: 10pt; text-align: center; color: #475569; margin-bottom: 16pt; font-style: italic; }
-  .toc-box { background: #f1f5f9; border: 1pt solid #cbd5e1; padding: 10pt 14pt; margin-bottom: 20pt; }
+  .toc-box { background: #f1f5f9; border: 1pt solid #cbd5e1; padding: 10pt 14pt; margin-bottom: 20pt; page-break-inside: avoid; }
   .toc-title { font-weight: bold; font-size: 11pt; color: #0f172a; margin-bottom: 4pt; text-transform: uppercase; }
   .lesson-block { margin-bottom: 18pt; }
-  h2.lesson-title { font-size: 13.5pt; font-weight: bold; color: #047857; border-bottom: 1.5pt solid #047857; padding-bottom: 4pt; margin-top: 14pt; margin-bottom: 6pt; }
+  .lesson-block > .lesson-meta { page-break-inside: avoid; }
+  h2.lesson-title { font-size: 13.5pt; font-weight: bold; color: #047857; border-bottom: 1.5pt solid #047857; padding-bottom: 4pt; margin-top: 14pt; margin-bottom: 6pt; page-break-after: avoid; }
   .lesson-meta { font-size: 9pt; color: #64748b; margin-bottom: 8pt; }
-  h3.section-header { font-size: 11pt; font-weight: bold; color: #1e293b; margin-top: 10pt; margin-bottom: 4pt; }
+  h3.section-header { font-size: 11pt; font-weight: bold; color: #1e293b; margin-top: 10pt; margin-bottom: 4pt; page-break-after: avoid; }
   ul { margin: 4pt 0 8pt 18pt; padding: 0; }
-  li { margin-bottom: 3pt; }
+  li { margin-bottom: 3pt; page-break-inside: avoid; }
   .formula-card { background: #eff6ff; border: 1pt solid #bfdbfe; padding: 7pt 10pt; margin-bottom: 7pt; text-align: center; page-break-inside: avoid; }
   .formula-math { font-size: 12.5pt; font-weight: bold; color: #1e40af; margin: 3pt 0; font-family: 'Cambria Math', 'Times New Roman', serif; text-align: center; }
   .formula-desc { font-size: 9pt; color: #374151; }
